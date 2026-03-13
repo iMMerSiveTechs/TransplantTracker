@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Linking, StyleSheet, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, StyleSheet, Modal, TextInput } from 'react-native';
+import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { RESTS, INIT_APPTS } from '@/data/restrictions';
 import { dBt, wBt, fmtDate, SURG_DEFAULT } from '@/utils/dates';
@@ -107,7 +108,7 @@ export default function MeScreen() {
     try {
       await generateAndShareReport();
     } catch {
-      Alert.alert('Error', 'Could not generate report. Try again.');
+      Burnt.toast({ title: 'Could not generate report', preset: 'error' });
     } finally {
       setSharing(false);
     }
