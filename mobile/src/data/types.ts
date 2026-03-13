@@ -32,6 +32,11 @@ export interface DailyLog {
   labK: string;
   labGlu: string;
   lastTacTime: number | null;
+  // Wellbeing
+  mood: number;           // 0=unset, 1-5 scale
+  sleepQuality: number;   // 0=unset, 1-5 scale
+  stressLevel: number;    // 0=unset, 1-5 scale
+  wellbeingNotes: string;
 }
 
 export const EMPTY_LOG: DailyLog = {
@@ -42,7 +47,24 @@ export const EMPTY_LOG: DailyLog = {
   acidReflux: false, gas: false, bloating: false, diarrhea: false, constipation: false, appetite: "normal",
   tenderness: false, swelling: false,
   notes: "", labCr: "", labTac: "", labGfr: "", labPhos: "", labK: "", labGlu: "", lastTacTime: null,
+  mood: 0, sleepQuality: 0, stressLevel: 0, wellbeingNotes: "",
 };
+
+// Medication adherence — stored at key `doses_YYYY-MM-DD`
+export interface MedDose {
+  medId: string;
+  timestamp: number;
+}
+
+// Lab file import scaffold — stored at key `lab_imports`
+export interface LabImport {
+  id: string;
+  date: string;
+  filename: string;
+  uri: string;
+  parsed: boolean;
+  values?: Partial<Pick<DailyLog, 'labCr' | 'labTac' | 'labGfr' | 'labPhos' | 'labK' | 'labGlu'>>;
+}
 
 export interface Contact {
   icon: string;

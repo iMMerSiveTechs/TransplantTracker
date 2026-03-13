@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
 import { colors } from '@/data/colors';
 import { LAB_R, labClr } from '@/data/labTests';
 import { toId } from '@/utils/dates';
@@ -8,12 +9,13 @@ import Card from '@/components/Card';
 import NumberField from '@/components/NumberField';
 import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
-import type { DailyLog } from '@/data/types';
+import type { DailyLog, LabImport } from '@/data/types';
 import { EMPTY_LOG } from '@/data/types';
 
 export default function LabsScreen() {
   const [log, setLog] = useState<DailyLog>(EMPTY_LOG);
   const [loaded, setLoaded] = useState<boolean>(false);
+  const [imports, setImports] = useState<LabImport[]>([]);
 
   const today = new Date();
   const todayId = toId(today);
@@ -21,11 +23,38 @@ export default function LabsScreen() {
   useEffect(() => {
     async function load() {
       const savedLog = await S.get(`log_${todayId}`);
+      const savedImports = await S.get('lab_imports');
       if (savedLog) setLog(savedLog);
+      if (savedImports) setImports(savedImports);
       setLoaded(true);
     }
     load();
   }, []);
+
+  const pickLabFile = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.length) return;
+    const asset = result.assets[0];
+    const newImport: LabImport = {
+      id: `lab_${Date.now()}`,
+      date: todayId,
+      filename: asset.name,
+      uri: asset.uri,
+      parsed: false,
+    };
+    const updated = [...imports, newImport];
+    setImports(updated);
+    await S.set('lab_imports', updated);
+  };
+
+  const removeImport = async (id: string) => {
+    const updated = imports.filter(i => i.id !== id);
+    setImports(updated);
+    await S.set('lab_imports', updated);
+  };
 
   useEffect(() => {
     if (loaded) {
@@ -46,11 +75,35 @@ export default function LabsScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={styles.title}>Lab Results</Text>
           <Text style={styles.subtitle}>Enter today's lab values</Text>
         </View>
+        <Pressable style={styles.importBtn} onPress={pickLabFile}>
+          <Text style={styles.importBtnText}>📄 Import</Text>
+        </Pressable>
       </View>
+
+      {/* Imported Files */}
+      {imports.length > 0 ? (
+        <>
+          <SectionLabel title="Imported Files" />
+          <Card>
+            {imports.map(imp => (
+              <View key={imp.id} style={styles.importRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.importName} numberOfLines={1}>{imp.filename}</Text>
+                  <Text style={styles.importDate}>{imp.date}</Text>
+                </View>
+                <Badge label="Not parsed" variant="muted" />
+                <Pressable style={styles.importRemove} onPress={() => removeImport(imp.id)}>
+                  <Text style={styles.importRemoveText}>✕</Text>
+                </Pressable>
+              </View>
+            ))}
+          </Card>
+        </>
+      ) : null}
 
       {/* Kidney Function */}
       <SectionLabel title="Kidney Function" />
@@ -221,4 +274,11 @@ const styles = StyleSheet.create({
   importantNote: { fontSize: 11, color: colors.indigo600, marginTop: 8, fontWeight: '600', lineHeight: 16 },
   infoTitle: { fontSize: 13, fontWeight: '700', color: colors.sky700, marginBottom: 6 },
   infoText: { fontSize: 12, color: colors.sky700, lineHeight: 18 },
+  importBtn: { backgroundColor: colors.indigo500, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  importBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
+  importRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.slate100 },
+  importName: { fontSize: 14, fontWeight: '600', color: colors.slate700 },
+  importDate: { fontSize: 11, color: colors.slate400, marginTop: 2 },
+  importRemove: { padding: 6 },
+  importRemoveText: { fontSize: 14, color: colors.slate400 },
 });

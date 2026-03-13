@@ -62,4 +62,5 @@ export function fastTn(): boolean {
   return !!getLabType(addD(new Date(), 1));
 }
 
-export const SURG_DEFAULT = new Date(2026, 1, 9, 12, 0, 0);
+// Fallback for users who haven't set their surgery date yet
+export const SURG_DEFAULT = new Date();

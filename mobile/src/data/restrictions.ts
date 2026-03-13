@@ -19,9 +19,4 @@ export const INIT_MEDS = [
   { id: "m3", name: "Prednisone", dosage: "Per doctor", instr: "Morning with food", inv: 30, ppd: 1, critical: true, color: "#D97706" },
 ];
 
-export const INIT_APPTS = [
-  { id: "a1", date: "2026-02-19", time: "1:30 PM", doc: "Dr. Katznelson", desc: "1 Wk Post-Discharge" },
-  { id: "a2", date: "2026-02-26", time: "9:30 AM", doc: "Dr. Sandhu", desc: "2 Wks Post-Discharge", labBy: "2026-02-25" },
-  { id: "a3", date: "2026-03-19", time: "9:30 AM", doc: "Dr. Peddi", desc: "4 Wks Post-Discharge", labBy: "2026-03-18" },
-  { id: "a4", date: "2026-04-20", time: "9:15 AM", doc: "Dr. Kung", desc: "8 Wks Post-Discharge", labBy: "2026-04-19" },
-];
+export const INIT_APPTS: import('../data/types').Appointment[] = [];

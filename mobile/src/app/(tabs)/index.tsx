@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors } from '@/data/colors';
-import { EMPTY_LOG, type DailyLog } from '@/data/types';
+import { EMPTY_LOG, type DailyLog, type MedDose, type Medication } from '@/data/types';
 import { CL_LIMITS } from '@/data/clinicalLimits';
 import { toId, fmtDate, greet, dBt, SURG_DEFAULT } from '@/utils/dates';
 import S from '@/utils/storage';
@@ -13,11 +14,15 @@ import SymCheck from '@/components/SymCheck';
 import BigCheck from '@/components/BigCheck';
 import TacTimer from '@/components/TacTimer';
 import Alrt from '@/components/Alert';
+import Ring from '@/components/Ring';
 
 export default function TodayScreen() {
   const [log, setLog] = useState<DailyLog>(EMPTY_LOG);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [profile, setProfile] = useState<any>(null);
+  const [medsDone, setMedsDone] = useState<number>(0);
+  const [medsTotal, setMedsTotal] = useState<number>(0);
+  const router = useRouter();
 
   const today = new Date();
   const todayId = toId(today);
@@ -30,6 +35,16 @@ export default function TodayScreen() {
       const savedProfile = await S.get('profile');
       if (savedLog) setLog(savedLog);
       if (savedProfile) setProfile(savedProfile);
+      // Load med compliance
+      const meds: Medication[] = (await S.get('medications')) ?? [];
+      const doses: MedDose[] = (await S.get(`doses_${todayId}`)) ?? [];
+      const total = meds.reduce((sum, m) => sum + m.ppd, 0);
+      const done = meds.reduce((sum, m) => {
+        const taken = doses.filter(d => d.medId === m.id).length;
+        return sum + Math.min(taken, m.ppd);
+      }, 0);
+      setMedsTotal(total);
+      setMedsDone(done);
       setLoaded(true);
     }
     load();
@@ -96,6 +111,28 @@ export default function TodayScreen() {
 
       {/* Tacrolimus Timer */}
       <TacTimer lastTacTime={log.lastTacTime} onTake={handleTacTaken} />
+
+      {/* Medication Compliance */}
+      {medsTotal > 0 ? (
+        <Pressable onPress={() => router.push('/(tabs)/meds')}>
+          <Card>
+            <View style={styles.complianceRow}>
+              <Ring progress={medsTotal > 0 ? medsDone / medsTotal : 0} size={52} color={medsDone >= medsTotal ? colors.emerald500 : colors.indigo500}>
+                <Text style={styles.complianceRingText}>{medsDone}/{medsTotal}</Text>
+              </Ring>
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={styles.complianceTitle}>
+                  {medsDone >= medsTotal ? 'All medications taken today ✓' : 'Medication Doses'}
+                </Text>
+                <Text style={styles.complianceSub}>
+                  {medsDone >= medsTotal ? 'Great job staying on track!' : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} remaining`}
+                </Text>
+              </View>
+              <Text style={styles.complianceArrow}>→</Text>
+            </View>
+          </Card>
+        </Pressable>
+      ) : null}
 
       {/* Daily Vitals */}
       <SectionLabel title="Daily Vitals" />
@@ -262,6 +299,58 @@ export default function TodayScreen() {
         <SymCheck label="Swelling" checked={log.swelling} onPress={() => upd('swelling', !log.swelling)} color="amber" />
       </Card>
 
+      {/* Wellbeing Check-in */}
+      <SectionLabel title="How Are You Feeling?" />
+      <Card accent={colors.indigo400}>
+        <Text style={styles.wbLabel}>Mood</Text>
+        <View style={styles.wbRow}>
+          {(['😞', '😕', '😐', '🙂', '😊'] as const).map((emoji, i) => (
+            <Pressable
+              key={i}
+              style={[styles.wbBtn, log.mood === i + 1 && styles.wbBtnActive]}
+              onPress={() => upd('mood', log.mood === i + 1 ? 0 : i + 1)}
+            >
+              <Text style={styles.wbEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.wbLabel}>Sleep Quality</Text>
+        <View style={styles.wbRow}>
+          {(['😴', '🥱', '😐', '😌', '🌟'] as const).map((emoji, i) => (
+            <Pressable
+              key={i}
+              style={[styles.wbBtn, log.sleepQuality === i + 1 && styles.wbBtnActive]}
+              onPress={() => upd('sleepQuality', log.sleepQuality === i + 1 ? 0 : i + 1)}
+            >
+              <Text style={styles.wbEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <Text style={styles.wbLabel}>Stress Level</Text>
+        <View style={styles.wbRow}>
+          {(['😌', '🙂', '😐', '😰', '🤯'] as const).map((emoji, i) => (
+            <Pressable
+              key={i}
+              style={[styles.wbBtn, log.stressLevel === i + 1 && styles.wbBtnActive]}
+              onPress={() => upd('stressLevel', log.stressLevel === i + 1 ? 0 : i + 1)}
+            >
+              <Text style={styles.wbEmoji}>{emoji}</Text>
+            </Pressable>
+          ))}
+        </View>
+
+        <TextInput
+          style={styles.wbNotes}
+          placeholder="Any notes about how you're feeling..."
+          placeholderTextColor={colors.slate400}
+          value={log.wellbeingNotes}
+          onChangeText={(v) => upd('wellbeingNotes', v)}
+          multiline
+        />
+      </Card>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -289,4 +378,15 @@ const styles = StyleSheet.create({
   painBtnActive: { backgroundColor: colors.rose500, borderColor: colors.rose500 },
   painBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate600 },
   painBtnTextActive: { color: colors.white },
+  complianceRow: { flexDirection: 'row', alignItems: 'center' },
+  complianceRingText: { fontSize: 11, fontWeight: '700', color: colors.slate700 },
+  complianceTitle: { fontSize: 15, fontWeight: '700', color: colors.slate800 },
+  complianceSub: { fontSize: 12, color: colors.slate500, marginTop: 2 },
+  complianceArrow: { fontSize: 18, color: colors.slate400 },
+  wbLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.slate600, marginBottom: 8, marginTop: 12 },
+  wbRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  wbBtn: { flex: 1, aspectRatio: 1, backgroundColor: colors.slate100, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.slate200 },
+  wbBtnActive: { backgroundColor: colors.indigo50, borderColor: colors.indigo400 },
+  wbEmoji: { fontSize: 22 },
+  wbNotes: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: colors.slate50, borderWidth: 1, borderColor: colors.slate200, fontSize: 14, color: colors.slate700, minHeight: 60, textAlignVertical: 'top' },
 });

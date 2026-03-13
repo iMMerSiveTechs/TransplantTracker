@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, Linking, StyleSheet, Modal, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, Linking, StyleSheet, Modal, TextInput, Platform } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
-import { RESTS, INIT_APPTS } from '@/data/restrictions';
-import { dBt, wBt, fmtDate, SURG_DEFAULT } from '@/utils/dates';
+import { RESTS, TRANSPLANT_TYPES } from '@/data/restrictions';
+import { dBt, wBt, fmtDate, toId, SURG_DEFAULT } from '@/utils/dates';
 import S from '@/utils/storage';
 import Card from '@/components/Card';
 import SectionLabel from '@/components/SectionLabel';
@@ -59,11 +60,12 @@ const CONTACT_ICONS = ['📞', '🏥', '👨‍⚕️', '💊', '🚑', '👩‍
 
 export default function MeScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [appts, setAppts] = useState<Appointment[]>(INIT_APPTS);
+  const [appts, setAppts] = useState<Appointment[]>([]);
   const [calMonth, setCalMonth] = useState<number>(new Date().getMonth());
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
   const [sharing, setSharing] = useState<boolean>(false);
 
+  // Contact modal state
   const [showContactModal, setShowContactModal] = useState<boolean>(false);
   const [editingContactIdx, setEditingContactIdx] = useState<number>(-1);
   const [cIcon, setCIcon] = useState<string>('📞');
@@ -71,6 +73,20 @@ export default function MeScreen() {
   const [cSub, setCSubText] = useState<string>('');
   const [cPhone, setCPhone] = useState<string>('');
   const [cUrgent, setCUrgent] = useState<boolean>(false);
+
+  // Profile editing state
+  const [showProfileEdit, setShowProfileEdit] = useState<boolean>(false);
+  const [editType, setEditType] = useState<string>('Kidney');
+  const [editSurgDate, setEditSurgDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
+
+  // Appointment modal state
+  const [showApptModal, setShowApptModal] = useState<boolean>(false);
+  const [editingApptId, setEditingApptId] = useState<string | null>(null);
+  const [aDate, setADate] = useState<string>('');
+  const [aTime, setATime] = useState<string>('');
+  const [aDoc, setADoc] = useState<string>('');
+  const [aDesc, setADesc] = useState<string>('');
 
   const today = new Date();
   const surgDate = profile?.surgDate ? new Date(profile.surgDate) : SURG_DEFAULT;
@@ -157,6 +173,53 @@ export default function MeScreen() {
     await saveProfile({ ...profile, contacts });
   };
 
+  // Profile editing
+  const openProfileEdit = () => {
+    setEditType(profile?.type || 'Kidney');
+    setEditSurgDate(profile?.surgDate ? new Date(profile.surgDate) : new Date());
+    setShowProfileEdit(true);
+  };
+
+  const saveProfileEdit = async () => {
+    if (!profile) return;
+    await saveProfile({ ...profile, type: editType, surgDate: editSurgDate });
+    setShowProfileEdit(false);
+    Burnt.toast({ title: 'Profile updated', preset: 'done' });
+  };
+
+  // Appointment CRUD
+  const saveAppts = async (updated: Appointment[]) => {
+    setAppts(updated);
+    await S.set('appointments', updated);
+  };
+
+  const openAddAppt = () => {
+    setEditingApptId(null);
+    setADate(''); setATime(''); setADoc(''); setADesc('');
+    setShowApptModal(true);
+  };
+
+  const openEditAppt = (apt: Appointment) => {
+    setEditingApptId(apt.id);
+    setADate(apt.date); setATime(apt.time); setADoc(apt.doc); setADesc(apt.desc);
+    setShowApptModal(true);
+  };
+
+  const saveAppt = async () => {
+    if (!aDate.trim() || !aTime.trim()) return;
+    if (editingApptId) {
+      await saveAppts(appts.map(a => a.id === editingApptId ? { ...a, date: aDate.trim(), time: aTime.trim(), doc: aDoc.trim(), desc: aDesc.trim() } : a));
+    } else {
+      const newAppt: Appointment = { id: `a_${Date.now()}`, date: aDate.trim(), time: aTime.trim(), doc: aDoc.trim(), desc: aDesc.trim() };
+      await saveAppts([...appts, newAppt].sort((a, b) => a.date.localeCompare(b.date)));
+    }
+    setShowApptModal(false);
+  };
+
+  const deleteAppt = async (id: string) => {
+    await saveAppts(appts.filter(a => a.id !== id));
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -172,8 +235,15 @@ export default function MeScreen() {
 
       {/* Surgery Stats */}
       <Card accent={colors.indigo500}>
-        <Text style={styles.surgLabel}>Transplant Date</Text>
-        <Text style={styles.surgDate}>{fmtDate(surgDate)}</Text>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <View>
+            <Text style={styles.surgLabel}>Transplant Date</Text>
+            <Text style={styles.surgDate}>{fmtDate(surgDate)}</Text>
+          </View>
+          <Pressable style={styles.editProfileBtn} onPress={openProfileEdit}>
+            <Text style={styles.editProfileBtnText}>Edit</Text>
+          </Pressable>
+        </View>
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
             <Text style={styles.statValue}>{daysSince}</Text>
@@ -233,12 +303,27 @@ export default function MeScreen() {
       </Card>
 
       {/* Upcoming Appointments */}
-      <SectionLabel title="Upcoming Appointments" />
-      {appts.slice(0, 3).map(apt => (
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeaderText}>Appointments</Text>
+        <Pressable style={styles.addContactBtn} onPress={openAddAppt}>
+          <Text style={styles.addContactBtnText}>+ Add</Text>
+        </Pressable>
+      </View>
+      {appts.length === 0 ? (
+        <Card flat style={{ backgroundColor: colors.slate100 }}>
+          <Text style={styles.noContactText}>No appointments yet. Tap "+ Add" to schedule one.</Text>
+        </Card>
+      ) : null}
+      {appts.map(apt => (
         <Card key={apt.id}>
           <View style={styles.aptHeader}>
             <Text style={styles.aptDate}>{apt.date}</Text>
-            <Badge label={apt.time} variant="info" />
+            <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+              <Badge label={apt.time} variant="info" />
+              <Pressable onPress={() => openEditAppt(apt)} style={styles.editContactBtn}>
+                <Text style={styles.editContactBtnText}>Edit</Text>
+              </Pressable>
+            </View>
           </View>
           <Text style={styles.aptDoc}>{apt.doc}</Text>
           <Text style={styles.aptDesc}>{apt.desc}</Text>
@@ -397,6 +482,108 @@ export default function MeScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </Modal>
+
+      {/* Profile Edit Modal */}
+      <Modal visible={showProfileEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProfileEdit(false)}>
+        <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Profile</Text>
+            <Pressable onPress={() => setShowProfileEdit(false)}>
+              <Text style={styles.modalClose}>✕</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.modalLabel}>Transplant Type</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+            {TRANSPLANT_TYPES.map(t => (
+              <Pressable
+                key={t}
+                style={[styles.typeChip, editType === t ? styles.typeChipActive : null]}
+                onPress={() => setEditType(t)}
+              >
+                <Text style={[styles.typeChipText, editType === t ? styles.typeChipTextActive : null]}>{t}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.modalLabel}>Surgery / Transplant Date</Text>
+          <Pressable style={styles.modalInput} onPress={() => setShowDatePicker(true)}>
+            <Text style={{ fontSize: 16, fontWeight: '500', color: colors.slate800, lineHeight: 50 }}>
+              {editSurgDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+            </Text>
+          </Pressable>
+
+          {showDatePicker && Platform.OS === 'ios' ? (
+            <View>
+              <DateTimePicker
+                value={editSurgDate}
+                mode="date"
+                display="spinner"
+                maximumDate={new Date()}
+                onChange={(_, d) => { if (d) setEditSurgDate(d); }}
+              />
+              <Pressable style={[styles.saveBtn, { marginTop: 8 }]} onPress={() => setShowDatePicker(false)}>
+                <Text style={styles.saveBtnText}>Done</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {showDatePicker && Platform.OS === 'android' ? (
+            <DateTimePicker
+              value={editSurgDate}
+              mode="date"
+              display="default"
+              maximumDate={new Date()}
+              onChange={(_, d) => { setShowDatePicker(false); if (d) setEditSurgDate(d); }}
+            />
+          ) : null}
+
+          <Pressable style={[styles.saveBtn, { marginTop: 24 }]} onPress={saveProfileEdit}>
+            <Text style={styles.saveBtnText}>Save Changes</Text>
+          </Pressable>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </Modal>
+
+      {/* Appointment Modal */}
+      <Modal visible={showApptModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowApptModal(false)}>
+        <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{editingApptId ? 'Edit Appointment' : 'Add Appointment'}</Text>
+            <Pressable onPress={() => setShowApptModal(false)}>
+              <Text style={styles.modalClose}>✕</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.modalLabel}>Date (YYYY-MM-DD) *</Text>
+          <TextInput value={aDate} onChangeText={setADate} placeholder="e.g. 2026-04-15" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Time *</Text>
+          <TextInput value={aTime} onChangeText={setATime} placeholder="e.g. 9:30 AM" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Doctor / Provider</Text>
+          <TextInput value={aDoc} onChangeText={setADoc} placeholder="e.g. Dr. Smith" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Description</Text>
+          <TextInput value={aDesc} onChangeText={setADesc} placeholder="e.g. 4-week follow-up" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+
+          <Pressable
+            style={[styles.saveBtn, (!aDate.trim() || !aTime.trim()) ? styles.btnDisabled : null]}
+            disabled={!aDate.trim() || !aTime.trim()}
+            onPress={saveAppt}
+          >
+            <Text style={styles.saveBtnText}>{editingApptId ? 'Save Changes' : 'Add Appointment'}</Text>
+          </Pressable>
+
+          {editingApptId ? (
+            <Pressable style={styles.deleteBtn} onPress={() => { deleteAppt(editingApptId); setShowApptModal(false); }}>
+              <Text style={styles.deleteBtnText}>🗑 Remove Appointment</Text>
+            </Pressable>
+          ) : null}
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -478,4 +665,10 @@ const styles = StyleSheet.create({
   deleteBtn: { marginTop: 12, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 2, borderColor: colors.rose200 },
   deleteBtnText: { fontSize: 15, fontWeight: '600', color: colors.rose500 },
   btnDisabled: { backgroundColor: colors.slate300 },
+  editProfileBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: colors.indigo200, backgroundColor: colors.indigo50 },
+  editProfileBtnText: { fontSize: 12, fontWeight: '600', color: colors.indigo600 },
+  typeChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: 2, borderColor: colors.slate200, backgroundColor: colors.white },
+  typeChipActive: { borderColor: colors.indigo500, backgroundColor: colors.indigo50 },
+  typeChipText: { fontSize: 13, fontWeight: '600', color: colors.slate600 },
+  typeChipTextActive: { color: colors.indigo600 },
 });

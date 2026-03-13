@@ -196,6 +196,35 @@ export default function HistoryScreen() {
         <Text style={styles.chartNote}>Track pain trends and report persistent high pain to your team</Text>
       </Card>
 
+      {/* Wellbeing */}
+      <SectionLabel title="Wellbeing" />
+      <Card>
+        <TrendChart
+          data={dataPoints}
+          dataKey="mood"
+          label="Mood"
+          unit="/5"
+          color={colors.indigo500}
+        />
+        <View style={{ height: 20 }} />
+        <TrendChart
+          data={dataPoints}
+          dataKey="sleepQuality"
+          label="Sleep Quality"
+          unit="/5"
+          color={colors.purple700}
+        />
+        <View style={{ height: 20 }} />
+        <TrendChart
+          data={dataPoints}
+          dataKey="stressLevel"
+          label="Stress Level"
+          unit="/5"
+          color={colors.amber500}
+        />
+        <Text style={styles.chartNote}>Track mood, sleep, and stress patterns over time</Text>
+      </Card>
+
       {/* Info */}
       <Card flat style={{ backgroundColor: colors.sky50 }}>
         <Text style={styles.infoTitle}>Reading Your Trends</Text>

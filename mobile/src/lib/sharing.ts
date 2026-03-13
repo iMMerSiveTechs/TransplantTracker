@@ -2,7 +2,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import S from '@/utils/storage';
 import { toId, addD } from '@/utils/dates';
-import type { Profile, Medication, DailyLog } from '@/data/types';
+import type { Profile, Medication, DailyLog, MedDose } from '@/data/types';
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -57,6 +57,42 @@ function medRows(meds: Medication[]): string {
   `).join('');
 }
 
+async function adherenceRows(meds: Medication[], days: Date[]): Promise<string> {
+  if (!meds.length) return '<tr><td colspan="3" style="text-align:center;color:#888;">No medications tracked</td></tr>';
+  const rows: string[] = [];
+  for (const med of meds) {
+    let taken = 0;
+    let total = 0;
+    for (const d of days) {
+      const doses: MedDose[] = (await S.get(`doses_${toId(d)}`)) ?? [];
+      const count = doses.filter(dose => dose.medId === med.id).length;
+      taken += Math.min(count, med.ppd);
+      total += med.ppd;
+    }
+    const pct = total > 0 ? Math.round((taken / total) * 100) : 0;
+    rows.push(`<tr><td>${med.name}</td><td>${taken}/${total} doses</td><td>${pct}%</td></tr>`);
+  }
+  return rows.join('');
+}
+
+function wellbeingRows(logs: { date: Date; log: DailyLog | null }[]): string {
+  const moodLabels = ['', 'Very Low', 'Low', 'Neutral', 'Good', 'Great'];
+  const stressLabels = ['', 'Very Low', 'Low', 'Moderate', 'High', 'Very High'];
+  const rows = logs
+    .filter(p => p.log && (p.log.mood > 0 || p.log.sleepQuality > 0 || p.log.stressLevel > 0))
+    .map(p => {
+      const l = p.log!;
+      return `<tr>
+        <td>${p.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
+        <td>${l.mood > 0 ? moodLabels[l.mood] : '—'}</td>
+        <td>${l.sleepQuality > 0 ? `${l.sleepQuality}/5` : '—'}</td>
+        <td>${l.stressLevel > 0 ? stressLabels[l.stressLevel] : '—'}</td>
+        <td>${l.wellbeingNotes || '—'}</td>
+      </tr>`;
+    }).join('');
+  return rows || '<tr><td colspan="5" style="text-align:center;color:#888;">No wellbeing data recorded</td></tr>';
+}
+
 export async function generateAndShareReport(): Promise<void> {
   const profile: Profile | null = await S.get('profile');
   const meds: Medication[] = (await S.get('medications')) || [];
@@ -70,9 +106,12 @@ export async function generateAndShareReport(): Promise<void> {
   }
 
   const recentPoints = points.slice(-7);
+  const allDates = points.map(p => p.date);
   const name = profile?.name || 'Patient';
   const transplantType = profile?.type || 'Transplant';
   const surgDate = profile?.surgDate ? fmtDate(new Date(profile.surgDate)) : 'Unknown';
+  const adherenceHtml = await adherenceRows(meds, allDates);
+  const wellbeingHtml = wellbeingRows(recentPoints);
 
   const html = `
 <!DOCTYPE html>
@@ -169,6 +208,36 @@ export async function generateAndShareReport(): Promise<void> {
     </thead>
     <tbody>
       ${medRows(meds)}
+    </tbody>
+  </table>
+
+  <h2>✅ Medication Adherence — Last 30 Days</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Medication</th>
+        <th>Doses Taken</th>
+        <th>Adherence</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${adherenceHtml}
+    </tbody>
+  </table>
+
+  <h2>🧠 Wellbeing — Last 7 Days</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Mood</th>
+        <th>Sleep</th>
+        <th>Stress</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${wellbeingHtml}
     </tbody>
   </table>
 

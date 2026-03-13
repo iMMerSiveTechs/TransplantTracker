@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '@/data/colors';
@@ -10,7 +10,8 @@ import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
 import Alrt from '@/components/Alert';
 import { requestNotificationPermission, scheduleMedReminder, cancelMedReminder } from '@/lib/notifications';
-import type { Medication } from '@/data/types';
+import type { Medication, MedDose } from '@/data/types';
+import { toId, addD } from '@/utils/dates';
 
 const MED_COLORS = ['#6366F1', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0284C7', '#DB2777'];
 
@@ -30,14 +31,49 @@ export default function MedsScreen() {
   const [formCritical, setFormCritical] = useState<boolean>(false);
   const [formColor, setFormColor] = useState<string>('#6366F1');
 
+  // Dose adherence state
+  const [todayDoses, setTodayDoses] = useState<MedDose[]>([]);
+  const [streaks, setStreaks] = useState<Record<string, number>>({});
+  const todayKey = `doses_${toId(new Date())}`;
+
   useEffect(() => {
     async function load() {
       const savedMeds = await S.get('medications');
       if (savedMeds) setMeds(savedMeds);
+      const doses = await S.get(todayKey);
+      if (doses) setTodayDoses(doses);
       setLoaded(true);
     }
     load();
   }, []);
+
+  // Calculate streaks when meds load
+  useEffect(() => {
+    if (!loaded) return;
+    calcStreaks();
+  }, [loaded, meds.length]);
+
+  const calcStreaks = useCallback(async () => {
+    const result: Record<string, number> = {};
+    for (const med of meds) {
+      let streak = 0;
+      let day = new Date();
+      // Check today first; if no doses yet today, start from yesterday
+      const todayD = await S.get(`doses_${toId(day)}`);
+      const todayTaken = (todayD as MedDose[] | null)?.some(d => d.medId === med.id) ?? false;
+      if (!todayTaken) day = addD(day, -1);
+      // Count consecutive past days
+      for (let i = 0; i < 365; i++) {
+        const key = `doses_${toId(day)}`;
+        const doses = i === 0 && todayTaken ? todayD : await S.get(key);
+        const taken = (doses as MedDose[] | null)?.some(d => d.medId === med.id) ?? false;
+        if (taken) { streak++; day = addD(day, -1); }
+        else break;
+      }
+      result[med.id] = streak;
+    }
+    setStreaks(result);
+  }, [meds]);
 
   useEffect(() => {
     if (loaded) {
@@ -47,6 +83,30 @@ export default function MedsScreen() {
 
   const updateMedInv = (id: string, delta: number) => {
     setMeds(meds.map(m => m.id === id ? { ...m, inv: Math.max(0, m.inv + delta) } : m));
+  };
+
+  const dosesTodayForMed = (medId: string) => todayDoses.filter(d => d.medId === medId).length;
+
+  const takeDose = async (med: Medication) => {
+    const dose: MedDose = { medId: med.id, timestamp: Date.now() };
+    const updated = [...todayDoses, dose];
+    setTodayDoses(updated);
+    await S.set(todayKey, updated);
+    // Auto-decrement inventory by 1
+    setMeds(prev => prev.map(m => m.id === med.id ? { ...m, inv: Math.max(0, m.inv - 1) } : m));
+    // Recalculate streaks
+    calcStreaks();
+  };
+
+  const undoLastDose = async (medId: string) => {
+    const idx = [...todayDoses].reverse().findIndex(d => d.medId === medId);
+    if (idx === -1) return;
+    const realIdx = todayDoses.length - 1 - idx;
+    const updated = todayDoses.filter((_, i) => i !== realIdx);
+    setTodayDoses(updated);
+    await S.set(todayKey, updated);
+    // Restore 1 pill
+    setMeds(prev => prev.map(m => m.id === medId ? { ...m, inv: m.inv + 1 } : m));
   };
 
   const toggleNotify = async (med: Medication) => {
@@ -169,6 +229,41 @@ export default function MedsScreen() {
           <Text style={styles.medInstr}>{med.instr}</Text>
         ) : null}
 
+        {/* Dose Tracking */}
+        <View style={styles.doseSection}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.doseStatus}>
+                {dosesTodayForMed(med.id) >= med.ppd ? '✅ All doses taken' : `${dosesTodayForMed(med.id)}/${med.ppd} doses today`}
+              </Text>
+              {(streaks[med.id] ?? 0) > 0 ? (
+                <Badge label={`🔥 ${streaks[med.id]}d streak`} variant="success" />
+              ) : null}
+            </View>
+            {dosesTodayForMed(med.id) > 0 ? (
+              <Text style={styles.lastDoseTime}>
+                Last: {new Date(todayDoses.filter(d => d.medId === med.id).slice(-1)[0]?.timestamp ?? 0).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              </Text>
+            ) : null}
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {dosesTodayForMed(med.id) < med.ppd ? (
+              <Pressable style={styles.takeDoseBtn} onPress={() => takeDose(med)}>
+                <Text style={styles.takeDoseBtnText}>💊 Take Dose</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.takeDoseBtnDone} disabled>
+                <Text style={styles.takeDoseBtnDoneText}>Done ✓</Text>
+              </Pressable>
+            )}
+            {dosesTodayForMed(med.id) > 0 ? (
+              <Pressable style={styles.undoBtn} onPress={() => undoLastDose(med.id)}>
+                <Text style={styles.undoBtnText}>Undo</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+
         <View style={styles.invSection}>
           <View style={{ flex: 1 }}>
             <Text style={styles.invLabel}>Inventory</Text>
@@ -249,7 +344,7 @@ export default function MedsScreen() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Medications</Text>
-          <Text style={styles.subtitle}>Track inventory & set reminders</Text>
+          <Text style={styles.subtitle}>Track doses, inventory & reminders</Text>
         </View>
         <Pressable style={styles.addBtn} onPress={openAddModal}>
           <Text style={styles.addBtnText}>+ Add Med</Text>
@@ -407,4 +502,13 @@ const styles = StyleSheet.create({
   deleteBtn: { marginTop: 12, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 2, borderColor: colors.rose200 },
   deleteBtnText: { fontSize: 15, fontWeight: '600', color: colors.rose500 },
   btnDisabled: { backgroundColor: colors.slate300 },
+  doseSection: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.slate50, padding: 12, borderRadius: 10, marginBottom: 12 },
+  doseStatus: { fontSize: 13, fontWeight: '600', color: colors.slate700 },
+  lastDoseTime: { fontSize: 11, color: colors.slate500, marginTop: 2 },
+  takeDoseBtn: { backgroundColor: colors.indigo500, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
+  takeDoseBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
+  takeDoseBtnDone: { backgroundColor: colors.emerald50, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
+  takeDoseBtnDoneText: { fontSize: 13, fontWeight: '700', color: colors.emerald700 },
+  undoBtn: { paddingHorizontal: 10, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.slate300 },
+  undoBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate500 },
 });
