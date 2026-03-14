@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { colors } from '@/data/colors';
@@ -11,7 +11,7 @@ import Badge from '@/components/Badge';
 import Alrt from '@/components/Alert';
 import { requestNotificationPermission, scheduleMedReminder, cancelMedReminder } from '@/lib/notifications';
 import type { Medication, MedDose } from '@/data/types';
-import { toId, addD } from '@/utils/dates';
+import { toId } from '@/utils/dates';
 
 const MED_COLORS = ['#6366F1', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0284C7', '#DB2777'];
 
@@ -33,7 +33,6 @@ export default function MedsScreen() {
 
   // Dose adherence state
   const [todayDoses, setTodayDoses] = useState<MedDose[]>([]);
-  const [streaks, setStreaks] = useState<Record<string, number>>({});
   const todayKey = `doses_${toId(new Date())}`;
 
   useEffect(() => {
@@ -47,33 +46,6 @@ export default function MedsScreen() {
     load();
   }, []);
 
-  // Calculate streaks when meds load
-  useEffect(() => {
-    if (!loaded) return;
-    calcStreaks();
-  }, [loaded, meds.length]);
-
-  const calcStreaks = useCallback(async () => {
-    const result: Record<string, number> = {};
-    for (const med of meds) {
-      let streak = 0;
-      let day = new Date();
-      // Check today first; if no doses yet today, start from yesterday
-      const todayD = await S.get(`doses_${toId(day)}`);
-      const todayTaken = (todayD as MedDose[] | null)?.some(d => d.medId === med.id) ?? false;
-      if (!todayTaken) day = addD(day, -1);
-      // Count consecutive past days
-      for (let i = 0; i < 90; i++) {
-        const key = `doses_${toId(day)}`;
-        const doses = i === 0 && todayTaken ? todayD : await S.get(key);
-        const taken = (doses as MedDose[] | null)?.some(d => d.medId === med.id) ?? false;
-        if (taken) { streak++; day = addD(day, -1); }
-        else break;
-      }
-      result[med.id] = streak;
-    }
-    setStreaks(result);
-  }, [meds]);
 
   useEffect(() => {
     if (loaded) {
@@ -94,8 +66,6 @@ export default function MedsScreen() {
     await S.set(todayKey, updated);
     // Auto-decrement inventory by 1
     setMeds(prev => prev.map(m => m.id === med.id ? { ...m, inv: Math.max(0, m.inv - 1) } : m));
-    // Recalculate streaks
-    calcStreaks();
   };
 
   const undoLastDose = async (medId: string) => {
@@ -423,7 +393,7 @@ export default function MedsScreen() {
 
           <Pressable style={[styles.criticalToggle, formCritical ? styles.criticalToggleActive : null]} onPress={() => setFormCritical(!formCritical)}>
             <Text style={styles.criticalToggleText}>
-              {formCritical ? '⭐ Critical Medication — never skip' : '☆ Mark as Critical'}
+              {formCritical ? 'Critical — do not skip or run out' : 'Mark as critical'}
             </Text>
           </Pressable>
 

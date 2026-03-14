@@ -51,7 +51,7 @@ function medRows(meds: Medication[]): string {
       <td>${m.name}</td>
       <td>${m.dosage || '—'}</td>
       <td>${m.instr || '—'}</td>
-      <td>${m.critical ? '⭐ Critical' : 'Standard'}</td>
+      <td>${m.critical ? 'Critical' : 'Standard'}</td>
       <td>${Math.floor(m.inv / m.ppd)} days</td>
     </tr>
   `).join('');
