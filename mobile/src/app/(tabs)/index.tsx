@@ -18,6 +18,8 @@ import Ring from '@/components/Ring';
 export default function TodayScreen() {
   const [log, setLog] = useState<DailyLog>(EMPTY_LOG);
   const [loaded, setLoaded] = useState<boolean>(false);
+  // Track whether we've received real data from storage (or confirmed it's absent)
+  const [logFromStorage, setLogFromStorage] = useState<boolean>(false);
   const [profile, setProfile] = useState<any>(null);
   const [medsDone, setMedsDone] = useState<number>(0);
   const [medsTotal, setMedsTotal] = useState<number>(0);
@@ -47,7 +49,10 @@ export default function TodayScreen() {
     async function load() {
       const savedLog = await S.get(`log_${todayId}`);
       const savedProfile = await S.get('profile');
-      if (savedLog) setLog(savedLog);
+      if (savedLog) {
+        setLog(savedLog);
+        setLogFromStorage(true);
+      }
       if (savedProfile) setProfile(savedProfile);
       setLoaded(true);
     }
@@ -55,9 +60,13 @@ export default function TodayScreen() {
   }, []);
 
   useEffect(() => {
-    if (loaded) {
-      S.set(`log_${todayId}`, log);
-    }
+    // Only persist if the user has made a change (log was modified after initial load,
+    // or we have confirmed there is no prior data and the user entered something).
+    // Never overwrite storage with EMPTY_LOG just because storage returned null.
+    if (!loaded) return;
+    const isEmpty = JSON.stringify(log) === JSON.stringify(EMPTY_LOG);
+    if (!logFromStorage && isEmpty) return;
+    S.set(`log_${todayId}`, log);
   }, [log, loaded]);
 
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });

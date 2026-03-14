@@ -46,15 +46,19 @@ function labRows(logs: { date: Date; log: DailyLog | null }[]): string {
 }
 
 function medRows(meds: Medication[]): string {
-  return meds.map(m => `
+  return meds.map(m => {
+    const daysLeft = m.ppd > 0 ? Math.floor(m.inv / m.ppd) : null;
+    const supplyStr = daysLeft !== null ? `${daysLeft} days` : '—';
+    return `
     <tr>
       <td>${m.name}</td>
       <td>${m.dosage || '—'}</td>
       <td>${m.instr || '—'}</td>
       <td>${m.critical ? 'Critical' : 'Standard'}</td>
-      <td>${Math.floor(m.inv / m.ppd)} days</td>
+      <td>${supplyStr}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 async function adherenceRows(meds: Medication[], days: Date[]): Promise<string> {

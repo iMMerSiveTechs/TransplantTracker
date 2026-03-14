@@ -156,14 +156,18 @@ export default function MeScreen() {
 
   const saveContact = async () => {
     if (!cLabel.trim() || !cPhone.trim()) return;
+    if (!profile) {
+      Burnt.toast({ title: 'Profile not loaded yet. Please try again.', preset: 'error' });
+      return;
+    }
     const newContact: Contact = { icon: cIcon, label: cLabel.trim(), sub: cSub.trim(), phone: cPhone.trim(), urgent: cUrgent };
-    const contacts = [...(profile?.contacts || [])];
+    const contacts = [...(profile.contacts || [])];
     if (editingContactIdx >= 0) {
       contacts[editingContactIdx] = newContact;
     } else {
       contacts.push(newContact);
     }
-    if (profile) await saveProfile({ ...profile, contacts });
+    await saveProfile({ ...profile, contacts });
     setShowContactModal(false);
   };
 
@@ -181,7 +185,10 @@ export default function MeScreen() {
   };
 
   const saveProfileEdit = async () => {
-    if (!profile) return;
+    if (!profile) {
+      Burnt.toast({ title: 'Profile not loaded yet. Please try again.', preset: 'error' });
+      return;
+    }
     await saveProfile({ ...profile, type: editType, surgDate: editSurgDate });
     setShowProfileEdit(false);
     Burnt.toast({ title: 'Profile updated', preset: 'done' });

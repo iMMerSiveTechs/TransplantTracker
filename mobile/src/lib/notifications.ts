@@ -50,20 +50,32 @@ export async function scheduleMedReminder(med: Medication): Promise<void> {
 }
 
 export async function cancelMedReminder(medId: string): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(`med_${medId}`);
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`med_${medId}`);
+  } catch (e) {
+    console.warn(`cancelMedReminder: failed to cancel reminder for ${medId}`, e);
+  }
 }
 
 export async function rescheduleAll(meds: Medication[]): Promise<void> {
-  // Cancel all existing med notifications then rebuild
-  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
-  for (const n of scheduled) {
-    if (n.identifier.startsWith('med_')) {
-      await Notifications.cancelScheduledNotificationAsync(n.identifier);
+  // Guard: do not attempt to schedule if permission is not granted
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') return;
+
+  try {
+    // Cancel all existing med notifications then rebuild
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const n of scheduled) {
+      if (n.identifier.startsWith('med_')) {
+        await Notifications.cancelScheduledNotificationAsync(n.identifier);
+      }
     }
-  }
-  for (const med of meds) {
-    if (med.notifyEnabled && med.reminderTime) {
-      await scheduleMedReminder(med);
+    for (const med of meds) {
+      if (med.notifyEnabled && med.reminderTime) {
+        await scheduleMedReminder(med);
+      }
     }
+  } catch (e) {
+    console.warn('rescheduleAll: failed to reschedule notifications', e);
   }
 }

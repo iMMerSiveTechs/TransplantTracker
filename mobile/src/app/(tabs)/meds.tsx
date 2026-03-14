@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
@@ -17,7 +18,7 @@ import { toId } from '@/utils/dates';
 const MED_COLORS = ['#6366F1', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0284C7', '#DB2777'];
 
 export default function MedsScreen() {
-  const [meds, setMeds] = useState<Medication[]>(INIT_MEDS);
+  const [meds, setMeds] = useState<Medication[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
@@ -40,13 +41,26 @@ export default function MedsScreen() {
   useEffect(() => {
     async function load() {
       const savedMeds = await S.get('medications');
-      if (savedMeds) setMeds(savedMeds);
+      // Use saved meds if available; fall back to INIT_MEDS only for fresh installs
+      // (when onboarding hasn't run yet and storage has never been written).
+      setMeds(savedMeds ?? INIT_MEDS);
       const doses = await S.get(getTodayKey());
       if (doses) setTodayDoses(doses);
+      else setTodayDoses([]);
       setLoaded(true);
     }
     load();
   }, []);
+
+  // Reload today's doses when the tab comes into focus — handles midnight rollovers
+  // and dose changes made via the Today tab's tacrolimus timer.
+  useFocusEffect(useCallback(() => {
+    async function refreshDoses() {
+      const doses = await S.get(getTodayKey());
+      setTodayDoses(doses ?? []);
+    }
+    refreshDoses();
+  }, []));
 
 
   useEffect(() => {

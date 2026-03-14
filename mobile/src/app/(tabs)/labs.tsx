@@ -15,6 +15,7 @@ import { EMPTY_LOG } from '@/data/types';
 export default function LabsScreen() {
   const [log, setLog] = useState<DailyLog>(EMPTY_LOG);
   const [loaded, setLoaded] = useState<boolean>(false);
+  const [logFromStorage, setLogFromStorage] = useState<boolean>(false);
   const [imports, setImports] = useState<LabImport[]>([]);
 
   const today = new Date();
@@ -24,7 +25,10 @@ export default function LabsScreen() {
     async function load() {
       const savedLog = await S.get(`log_${todayId}`);
       const savedImports = await S.get('lab_imports');
-      if (savedLog) setLog(savedLog);
+      if (savedLog) {
+        setLog(savedLog);
+        setLogFromStorage(true);
+      }
       if (savedImports) setImports(savedImports);
       setLoaded(true);
     }
@@ -57,9 +61,10 @@ export default function LabsScreen() {
   };
 
   useEffect(() => {
-    if (loaded) {
-      S.set(`log_${todayId}`, log);
-    }
+    if (!loaded) return;
+    const isEmpty = JSON.stringify(log) === JSON.stringify(EMPTY_LOG);
+    if (!logFromStorage && isEmpty) return;
+    S.set(`log_${todayId}`, log);
   }, [log, loaded]);
 
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });
@@ -91,8 +96,6 @@ export default function LabsScreen() {
           <Card>
             {imports.map(imp => {
               const isPdf = imp.filename.toLowerCase().endsWith('.pdf');
-              const fileType = isPdf ? 'PDF' : 'Image';
-              const fileVariant = isPdf ? 'info' : 'success';
               const importedDate = imp.date
                 ? new Date(imp.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
                 : '—';
@@ -101,9 +104,9 @@ export default function LabsScreen() {
                   <Text style={styles.importIcon}>{isPdf ? '📄' : '🖼️'}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.importName} numberOfLines={1}>{imp.filename}</Text>
-                    <Text style={styles.importDate}>Saved {importedDate}</Text>
+                    <Text style={styles.importDate}>Saved {importedDate} · Enter values manually</Text>
                   </View>
-                  <Badge label={fileType} variant={fileVariant} />
+                  <Badge label="Saved" variant="muted" />
                   <Pressable style={styles.importRemove} onPress={() => removeImport(imp.id)}>
                     <Text style={styles.importRemoveText}>✕</Text>
                   </Pressable>
