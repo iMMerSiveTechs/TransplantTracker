@@ -28,7 +28,6 @@ export default function TodayScreen() {
   const router = useRouter();
 
   const today = new Date();
-  const todayId = toId(today);
   const surgDate = profile?.surgDate ? new Date(profile.surgDate) : getSurgDefault();
   const daysSince = dBt(surgDate, today);
 
@@ -95,7 +94,6 @@ export default function TodayScreen() {
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });
 
   // Validation helpers
-  const weightNum = parseFloat(log.weight);
   const amTempNum = parseFloat(log.amTemp);
   const pmTempNum = parseFloat(log.pmTemp);
   const amSysNum = parseFloat(log.amSys);
@@ -106,8 +104,6 @@ export default function TodayScreen() {
   const hasFever = (amTempNum >= CL_LIMITS.feverWarning) || (pmTempNum >= CL_LIMITS.feverWarning);
   const hasBpIssue = (amSysNum > CL_LIMITS.bpSysHigh) || (pmSysNum > CL_LIMITS.bpSysHigh) ||
                       (amSysNum < CL_LIMITS.bpSysLow) || (pmSysNum < CL_LIMITS.bpSysLow);
-  const hasHrIssue = (amHrNum > CL_LIMITS.hrHigh) || (pmHrNum > CL_LIMITS.hrHigh) ||
-                     (amHrNum < CL_LIMITS.hrLow) || (pmHrNum < CL_LIMITS.hrLow);
 
   const fluidPct = (log.fluidMl / CL_LIMITS.fluidGoal) * 100;
   const hasSymptoms = log.incision || log.nausea || log.urineDown || log.burning || log.pain > 0;

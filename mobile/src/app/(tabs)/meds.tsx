@@ -12,7 +12,7 @@ import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
 import Alrt from '@/components/Alert';
 import { requestNotificationPermission, scheduleMedReminder, cancelMedReminder } from '@/lib/notifications';
-import type { Medication, MedDose } from '@/data/types';
+import { EMPTY_LOG, type Medication, type MedDose } from '@/data/types';
 import { toId } from '@/utils/dates';
 
 const MED_COLORS = ['#6366F1', '#059669', '#D97706', '#DC2626', '#7C3AED', '#0284C7', '#DB2777'];
@@ -22,6 +22,7 @@ export default function MedsScreen() {
   const [loaded, setLoaded] = useState<boolean>(false);
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showTimePicker, setShowTimePicker] = useState<string | null>(null);
   const [timePickerDate, setTimePickerDate] = useState<Date>(new Date());
 
@@ -82,6 +83,12 @@ export default function MedsScreen() {
     await S.set(getTodayKey(), updated);
     // Auto-decrement inventory by 1
     setMeds(prev => prev.map(m => m.id === med.id ? { ...m, inv: Math.max(0, m.inv - 1) } : m));
+    // Sync lastTacTime to daily log so TacTimer on Today tab stays accurate
+    if (med.isTac) {
+      const dayKey = toId(new Date());
+      const dayLog = (await S.get(`log_${dayKey}`)) ?? { ...EMPTY_LOG };
+      await S.set(`log_${dayKey}`, { ...dayLog, lastTacTime: dose.timestamp });
+    }
   };
 
   const undoLastDose = async (medId: string) => {
@@ -201,6 +208,7 @@ export default function MedsScreen() {
     const daysLeft = Math.floor(med.inv / med.ppd);
     const progressPct = (daysLeft / 30) * 100;
     const doseCount = dosesTodayForMed(med.id);
+    const lastDose = todayDoses.filter(d => d.medId === med.id).slice(-1)[0];
 
     return (
       <Card key={med.id} accent={med.color}>
@@ -233,9 +241,9 @@ export default function MedsScreen() {
                   ? (med.ppd === 1 ? 'No dose logged today' : 'No doses logged today')
                   : `${doseCount} of ${med.ppd} doses logged · ${med.ppd - doseCount} remaining`}
             </Text>
-            {doseCount > 0 ? (
+            {lastDose ? (
               <Text style={styles.lastDoseTime}>
-                Taken at {new Date(todayDoses.filter(d => d.medId === med.id).slice(-1)[0]!.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                Taken at {new Date(lastDose.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
               </Text>
             ) : null}
           </View>
@@ -353,7 +361,13 @@ export default function MedsScreen() {
         />
       ) : null}
 
-      <SectionLabel title="Critical Medications" sub="Never skip or run out" />
+      {meds.length === 0 ? (
+        <Card flat style={{ backgroundColor: colors.slate100 }}>
+          <Text style={styles.emptyText}>No medications added yet. Tap "+ Add Med" to get started.</Text>
+        </Card>
+      ) : null}
+
+      {meds.length > 0 ? <SectionLabel title="Critical Medications" sub="Never skip or run out" /> : null}
       {criticalMeds.map(renderMedCard)}
 
       {otherMeds.length > 0 ? (
@@ -425,9 +439,23 @@ export default function MedsScreen() {
           </Pressable>
 
           {editingMed ? (
-            <Pressable style={styles.deleteBtn} onPress={() => { deleteMed(editingMed.id); setShowAddModal(false); }}>
-              <Text style={styles.deleteBtnText}>🗑 Remove Medication</Text>
-            </Pressable>
+            confirmDeleteId === editingMed.id ? (
+              <View style={styles.confirmDeleteRow}>
+                <Text style={styles.confirmDeleteText}>Remove {editingMed.name}? This cannot be undone.</Text>
+                <View style={styles.confirmDeleteBtns}>
+                  <Pressable style={styles.confirmCancelBtn} onPress={() => setConfirmDeleteId(null)}>
+                    <Text style={styles.confirmCancelText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable style={styles.confirmDeleteBtn} onPress={() => { deleteMed(editingMed.id); setShowAddModal(false); setConfirmDeleteId(null); }}>
+                    <Text style={styles.confirmDeleteBtnText}>Yes, Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <Pressable style={styles.deleteBtn} onPress={() => setConfirmDeleteId(editingMed.id)}>
+                <Text style={styles.deleteBtnText}>🗑 Remove Medication</Text>
+              </Pressable>
+            )
           ) : null}
 
           <View style={{ height: 40 }} />
@@ -495,6 +523,14 @@ const styles = StyleSheet.create({
   deleteBtn: { marginTop: 12, paddingVertical: 14, borderRadius: 14, alignItems: 'center', borderWidth: 2, borderColor: colors.rose200 },
   deleteBtnText: { fontSize: 15, fontWeight: '600', color: colors.rose500 },
   btnDisabled: { backgroundColor: colors.slate300 },
+  emptyText: { fontSize: 14, color: colors.slate500, textAlign: 'center', paddingVertical: 20 },
+  confirmDeleteRow: { marginTop: 12, padding: 14, borderRadius: 14, borderWidth: 2, borderColor: colors.rose200, backgroundColor: colors.rose50 },
+  confirmDeleteText: { fontSize: 14, fontWeight: '600', color: colors.rose700, textAlign: 'center', marginBottom: 12 },
+  confirmDeleteBtns: { flexDirection: 'row', gap: 8 },
+  confirmCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.slate200, alignItems: 'center' },
+  confirmCancelText: { fontSize: 14, fontWeight: '600', color: colors.slate700 },
+  confirmDeleteBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.rose500, alignItems: 'center' },
+  confirmDeleteBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
   doseSection: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.slate50, padding: 12, borderRadius: 10, marginBottom: 12 },
   doseStatus: { fontSize: 13, fontWeight: '600', color: colors.slate700 },
   lastDoseTime: { fontSize: 11, color: colors.slate500, marginTop: 2 },
