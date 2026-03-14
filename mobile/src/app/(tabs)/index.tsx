@@ -68,14 +68,13 @@ export default function TodayScreen() {
     load();
   }, []);
 
-  // On focus: refresh med compliance ring and reload log if day has rolled over
+  // On focus: refresh med compliance ring and reload daily log.
+  // Always reload (not just on date change) so cross-tab writes (e.g. Meds → lastTacTime)
+  // and midnight rollovers are picked up immediately.
   useFocusEffect(useCallback(() => {
     loadMedCompliance();
-    const currentId = toId(new Date());
-    if (loadedDateKey && loadedDateKey !== currentId) {
-      loadDayLog();
-    }
-  }, [loadMedCompliance, loadDayLog, loadedDateKey]));
+    loadDayLog();
+  }, [loadMedCompliance, loadDayLog]));
 
   useEffect(() => {
     // Only persist if the user has made a change (log was modified after initial load,
@@ -277,6 +276,7 @@ export default function TodayScreen() {
             <Pressable
               key={amt}
               style={styles.fluidBtn}
+              accessibilityLabel={`Add ${amt} milliliters of fluid`}
               onPress={() => upd('fluidMl', log.fluidMl + amt)}
             >
               <Text style={styles.fluidBtnText}>+{amt} mL</Text>
@@ -299,6 +299,8 @@ export default function TodayScreen() {
             <Pressable
               key={i}
               style={[styles.painBtn, log.pain === i && styles.painBtnActive]}
+              accessibilityLabel={`Pain level ${i}`}
+              accessibilityRole="button"
               onPress={() => upd('pain', i)}
             >
               <Text style={[styles.painBtnText, log.pain === i && styles.painBtnTextActive]}>{i}</Text>
@@ -390,11 +392,11 @@ const styles = StyleSheet.create({
   progressBg: { height: 12, backgroundColor: colors.slate200, borderRadius: 999, overflow: 'hidden', marginBottom: 16 },
   progressBar: { height: '100%', backgroundColor: colors.indigo500, borderRadius: 999 },
   fluidButtons: { flexDirection: 'row', gap: 8 },
-  fluidBtn: { flex: 1, backgroundColor: colors.indigo500, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
+  fluidBtn: { flex: 1, minHeight: 44, backgroundColor: colors.indigo500, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   fluidBtnText: { fontSize: 14, fontWeight: '600', color: colors.white },
   painLabel: { fontSize: 12, fontWeight: '600', color: colors.slate600, marginBottom: 8 },
   painScale: { flexDirection: 'row', gap: 3 },
-  painBtn: { flex: 1, paddingVertical: 8, backgroundColor: colors.slate100, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.slate200 },
+  painBtn: { flex: 1, minHeight: 44, paddingVertical: 8, backgroundColor: colors.slate100, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.slate200 },
   painBtnActive: { backgroundColor: colors.rose500, borderColor: colors.rose500 },
   painBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate600 },
   painBtnTextActive: { color: colors.white },

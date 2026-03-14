@@ -38,6 +38,7 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="dev" options={{ title: 'Dev Tools', presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );

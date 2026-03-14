@@ -44,13 +44,10 @@ export default function LabsScreen() {
     load();
   }, []);
 
-  // Reload if day has rolled over since the log was last loaded
+  // Always reload on focus to catch midnight rollovers and writes from other tabs
   useFocusEffect(useCallback(() => {
-    const currentId = toId(new Date());
-    if (loadedDateKey && loadedDateKey !== currentId) {
-      loadDayLog();
-    }
-  }, [loadedDateKey, loadDayLog]));
+    loadDayLog();
+  }, [loadDayLog]));
 
   const pickLabFile = async () => {
     const currentId = toId(new Date());
@@ -106,14 +103,14 @@ export default function LabsScreen() {
           <Text style={styles.subtitle}>Enter today's lab values</Text>
         </View>
         <Pressable style={styles.importBtn} onPress={pickLabFile}>
-          <Text style={styles.importBtnText}>📄 Import</Text>
+          <Text style={styles.importBtnText}>📎 Attach</Text>
         </Pressable>
       </View>
 
       {/* Imported Files */}
       {imports.length > 0 ? (
         <>
-          <SectionLabel title="Imported Files" />
+          <SectionLabel title="Attached Lab Files" sub="Reference only — enter values manually" />
           <Card>
             {imports.map(imp => {
               const isPdf = imp.filename.toLowerCase().endsWith('.pdf');
@@ -125,7 +122,7 @@ export default function LabsScreen() {
                   <Text style={styles.importIcon}>{isPdf ? '📄' : '🖼️'}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.importName} numberOfLines={1}>{imp.filename}</Text>
-                    <Text style={styles.importDate}>Saved {importedDate} · Enter values manually</Text>
+                    <Text style={styles.importDate}>Attached {importedDate} · reference only</Text>
                   </View>
                   <Badge label="Saved" variant="muted" />
                   <Pressable style={styles.importRemove} onPress={() => removeImport(imp.id)}>

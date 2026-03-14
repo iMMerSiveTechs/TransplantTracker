@@ -261,14 +261,19 @@ export async function generateAndShareReport(): Promise<void> {
 </html>
   `;
 
-  const { uri } = await Print.printToFileAsync({ html, base64: false });
-
-  const canShare = await Sharing.isAvailableAsync();
-  if (canShare) {
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: 'Share Health Report',
-      UTI: 'com.adobe.pdf',
-    });
+  try {
+    const { uri } = await Print.printToFileAsync({ html, base64: false });
+    const canShare = await Sharing.isAvailableAsync();
+    if (canShare) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Share Health Report',
+        UTI: 'com.adobe.pdf',
+      });
+    } else {
+      throw new Error('Sharing is not available on this device.');
+    }
+  } catch (err) {
+    throw new Error(err instanceof Error ? err.message : 'Export failed. Please try again.');
   }
 }

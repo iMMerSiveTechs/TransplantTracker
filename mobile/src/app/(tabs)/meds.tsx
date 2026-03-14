@@ -100,6 +100,15 @@ export default function MedsScreen() {
     await S.set(getTodayKey(), updated);
     // Restore 1 pill
     setMeds(prev => prev.map(m => m.id === medId ? { ...m, inv: m.inv + 1 } : m));
+    // Revert lastTacTime in daily log if this was a tac dose
+    const tacMed = meds.find(m => m.id === medId && m.isTac);
+    if (tacMed) {
+      const dayKey = toId(new Date());
+      const dayLog = (await S.get(`log_${dayKey}`)) ?? { ...EMPTY_LOG };
+      const remaining = updated.filter(d => d.medId === medId);
+      const prevTime = remaining.length > 0 ? remaining[remaining.length - 1].timestamp : null;
+      await S.set(`log_${dayKey}`, { ...dayLog, lastTacTime: prevTime });
+    }
   };
 
   const toggleNotify = async (med: Medication) => {
@@ -169,15 +178,21 @@ export default function MedsScreen() {
     setShowAddModal(true);
   };
 
-  const saveMed = () => {
+  const saveMed = async () => {
     if (!formName.trim()) return;
     if (editingMed) {
-      setMeds(meds.map(m => m.id === editingMed.id ? {
-        ...m,
+      const updatedMed: Medication = {
+        ...editingMed,
         name: formName.trim(), dosage: formDosage.trim(), instr: formInstr.trim(),
         inv: parseInt(formInv) || 30, ppd: parseInt(formPpd) || 1,
         critical: formCritical, color: formColor,
-      } : m));
+      };
+      setMeds(meds.map(m => m.id === editingMed.id ? updatedMed : m));
+      // Reschedule notification if enabled — ensures name/time changes take effect
+      if (updatedMed.notifyEnabled && updatedMed.reminderTime) {
+        await cancelMedReminder(updatedMed.id);
+        await scheduleMedReminder(updatedMed);
+      }
     } else {
       const newMed: Medication = {
         id: `m_${Date.now()}`,
@@ -249,7 +264,7 @@ export default function MedsScreen() {
           </View>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             {doseCount < med.ppd ? (
-              <Pressable style={styles.takeDoseBtn} onPress={() => takeDose(med)}>
+              <Pressable style={styles.takeDoseBtn} onPress={() => takeDose(med)} accessibilityLabel={`Log dose for ${med.name}`}>
                 <Text style={styles.takeDoseBtnText}>Log Dose</Text>
               </Pressable>
             ) : (

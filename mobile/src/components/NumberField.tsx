@@ -23,6 +23,7 @@ export default function NumberField({ label, value, onChange, unit, error, place
           placeholderTextColor={colors.slate300}
           keyboardType="decimal-pad"
           style={styles.input}
+          accessibilityLabel={label}
         />
         {unit ? <Text style={styles.unit}>{unit}</Text> : null}
       </View>

@@ -26,7 +26,7 @@ export default function TacTimer({ lastTacTime, onTake }: TacTimerProps) {
             <Text style={styles.titleIndigo}>{"\u23F1\uFE0F"} Tacrolimus Timer</Text>
             <Text style={styles.sub}>Tap when you take your dose</Text>
           </View>
-          <Pressable onPress={onTake} style={styles.logBtn}>
+          <Pressable onPress={onTake} style={styles.logBtn} accessibilityLabel="Log tacrolimus dose">
             <Text style={styles.logBtnText}>Log Dose</Text>
           </Pressable>
         </View>
@@ -38,10 +38,14 @@ export default function TacTimer({ lastTacTime, onTake }: TacTimerProps) {
   const target = 12 * 3600000;
   const remaining = Math.max(target - elapsed, 0);
   const pct = cl(elapsed / target, 0, 1);
-  const overdue = remaining === 0;
+  const overdue = elapsed >= target;
   const hrs = Math.floor(remaining / 3600000);
   const mins = Math.floor((remaining % 3600000) / 60000);
   const secs = Math.floor((remaining % 60000) / 1000);
+  const overdueMs = overdue ? elapsed - target : 0;
+  const overdueHrs = Math.floor(overdueMs / 3600000);
+  const overdueMins = Math.floor((overdueMs % 3600000) / 60000);
+  const overdueStr = overdueHrs > 0 ? `${overdueHrs}h ${overdueMins}m overdue` : `${overdueMins}m overdue`;
   const urgC = overdue ? "#E11D48" : remaining < 3600000 ? "#D97706" : "#6366F1";
   const takenStr = new Date(lastTacTime).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
@@ -49,20 +53,24 @@ export default function TacTimer({ lastTacTime, onTake }: TacTimerProps) {
     <Card accent={urgC}>
       <View style={styles.row}>
         <Ring progress={pct} size={64} color={urgC}>
-          <Text style={[styles.ringText, { color: urgC }]}>{overdue ? "NOW" : `${hrs}h`}</Text>
+          <Text style={[styles.ringText, { color: urgC }]}>{overdue ? "!" : `${hrs}h`}</Text>
         </Ring>
         <View style={styles.flex1}>
           <Text style={[styles.titleText, { color: overdue ? "#E11D48" : colors.slate800 }]}>
             {overdue ? "\u{1F6A8} Tacrolimus Due NOW" : "\u23F1\uFE0F Next Tacrolimus"}
           </Text>
           {overdue ? (
-            <Text style={styles.overdueText}>12 hours have passed. Take now.</Text>
+            <Text style={styles.overdueText}>{overdueStr} — take now</Text>
           ) : (
             <Text style={styles.timeText}>{hrs}h {String(mins).padStart(2, "0")}m {String(secs).padStart(2, "0")}s</Text>
           )}
           <Text style={styles.lastText}>Last: {takenStr}</Text>
         </View>
-        <Pressable onPress={onTake} style={[styles.takeBtn, overdue ? styles.takeBtnOverdue : styles.takeBtnNormal]}>
+        <Pressable
+          onPress={onTake}
+          style={[styles.takeBtn, overdue ? styles.takeBtnOverdue : styles.takeBtnNormal]}
+          accessibilityLabel={overdue ? "Take tacrolimus now" : "Re-log tacrolimus dose"}
+        >
           <Text style={[styles.takeBtnText, overdue ? { color: colors.white } : { color: colors.slate600 }]}>
             {overdue ? "Take Now" : "Re-log"}
           </Text>

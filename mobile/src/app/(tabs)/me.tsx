@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Linking, StyleSheet, Modal, TextInput, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
@@ -59,6 +60,7 @@ const TRANSPLANT_TIPS: Record<string, string[]> = {
 const CONTACT_ICONS = ['📞', '🏥', '👨‍⚕️', '💊', '🚑', '👩‍⚕️', '🏠', '👨‍👩‍👧'];
 
 export default function MeScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [appts, setAppts] = useState<Appointment[]>([]);
   const [calMonth, setCalMonth] = useState<number>(new Date().getMonth());
@@ -438,6 +440,12 @@ export default function MeScreen() {
         </Text>
       </Card>
 
+      {__DEV__ ? (
+        <Pressable style={styles.devBtn} onPress={() => router.push('/dev')}>
+          <Text style={styles.devBtnText}>🛠 Dev Tools</Text>
+        </Pressable>
+      ) : null}
+
       <View style={{ height: 40 }} />
 
       {/* Contact Modal */}
@@ -648,6 +656,8 @@ const styles = StyleSheet.create({
   editContactBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.slate300 },
   editContactBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate600 },
   noContactText: { fontSize: 13, color: colors.slate500, textAlign: 'center', paddingVertical: 8 },
+  devBtn: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: colors.slate300, alignSelf: 'center' },
+  devBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate400 },
   shareInfoTitle: { fontSize: 14, fontWeight: '700', color: colors.emerald700, marginBottom: 6 },
   shareInfoText: { fontSize: 13, color: colors.emerald700, lineHeight: 20 },
   modal: { flex: 1, backgroundColor: colors.slate50 },
