@@ -249,7 +249,7 @@ export default function MedsScreen() {
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             {doseCount < med.ppd ? (
               <Pressable style={styles.takeDoseBtn} onPress={() => takeDose(med)}>
-                <Text style={styles.takeDoseBtnText}>💊 Take Dose</Text>
+                <Text style={styles.takeDoseBtnText}>Log Dose</Text>
               </Pressable>
             ) : (
               <Pressable style={styles.takeDoseBtnDone} disabled>

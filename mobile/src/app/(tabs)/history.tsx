@@ -231,7 +231,7 @@ export default function HistoryScreen() {
         <Text style={styles.infoText}>
           • Rising weight (2+ lbs/day), BP, or temperature: contact your team right away{'\n'}
           • Falling GFR or rising creatinine: call your coordinator{'\n'}
-          • Improving mood and sleep trends are great signs of recovery{'\n'}
+          • Improving mood and sleep trends are positive indicators of recovery{'\n'}
           • Red data points mean a value is outside your safe range{'\n'}
           • Daily logging gives your care team better information
         </Text>

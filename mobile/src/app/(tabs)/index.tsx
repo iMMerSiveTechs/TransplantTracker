@@ -292,7 +292,7 @@ export default function TodayScreen() {
       </Card>
 
       {/* Wellbeing Check-in */}
-      <SectionLabel title="How Are You Feeling?" />
+      <SectionLabel title="Wellbeing Check-in" />
       <Card accent={colors.indigo400}>
         <Text style={styles.wbLabel}>Mood</Text>
         <View style={styles.wbRow}>
