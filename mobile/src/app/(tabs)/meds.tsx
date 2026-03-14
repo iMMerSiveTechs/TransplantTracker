@@ -233,21 +233,23 @@ export default function MedsScreen() {
         {/* Dose Tracking */}
         <View style={styles.doseSection}>
           <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.doseStatus}>
-                {doseCount >= med.ppd ? '✅ All doses taken' : `${doseCount}/${med.ppd} doses today`}
-              </Text>
-              {(streaks[med.id] ?? 0) > 0 ? (
-                <Badge label={`🔥 ${streaks[med.id]}d streak`} variant="success" />
-              ) : null}
-            </View>
+            <Text style={styles.doseStatus}>
+              {doseCount >= med.ppd
+                ? '✅ All done for today'
+                : doseCount === 0
+                  ? (med.ppd === 1 ? 'Not yet taken today' : `None taken · ${med.ppd} due today`)
+                  : `${doseCount} of ${med.ppd} taken · ${med.ppd - doseCount} more needed`}
+            </Text>
             {doseCount > 0 ? (
               <Text style={styles.lastDoseTime}>
-                Last: {new Date(todayDoses.filter(d => d.medId === med.id).slice(-1)[0]!.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                Taken at {new Date(todayDoses.filter(d => d.medId === med.id).slice(-1)[0]!.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
               </Text>
             ) : null}
+            {(streaks[med.id] ?? 0) >= 2 ? (
+              <Text style={styles.streakText}>🔥 {streaks[med.id]}-day streak</Text>
+            ) : null}
           </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
             {doseCount < med.ppd ? (
               <Pressable style={styles.takeDoseBtn} onPress={() => takeDose(med)}>
                 <Text style={styles.takeDoseBtnText}>💊 Take Dose</Text>
@@ -259,7 +261,7 @@ export default function MedsScreen() {
             )}
             {doseCount > 0 ? (
               <Pressable style={styles.undoBtn} onPress={() => undoLastDose(med.id)}>
-                <Text style={styles.undoBtnText}>Undo</Text>
+                <Text style={styles.undoBtnText}>↩ Undo</Text>
               </Pressable>
             ) : null}
           </View>
@@ -510,6 +512,7 @@ const styles = StyleSheet.create({
   takeDoseBtnText: { fontSize: 13, fontWeight: '700', color: colors.white },
   takeDoseBtnDone: { backgroundColor: colors.emerald50, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10 },
   takeDoseBtnDoneText: { fontSize: 13, fontWeight: '700', color: colors.emerald700 },
-  undoBtn: { paddingHorizontal: 10, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: colors.slate300 },
-  undoBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate500 },
+  undoBtn: { paddingHorizontal: 6, paddingVertical: 10, justifyContent: 'center' },
+  undoBtnText: { fontSize: 12, color: colors.slate400 },
+  streakText: { fontSize: 11, fontWeight: '600', color: colors.amber700, marginTop: 3 },
 });

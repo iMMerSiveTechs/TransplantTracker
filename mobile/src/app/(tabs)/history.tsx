@@ -229,10 +229,11 @@ export default function HistoryScreen() {
       <Card flat style={{ backgroundColor: colors.sky50 }}>
         <Text style={styles.infoTitle}>Reading Your Trends</Text>
         <Text style={styles.infoText}>
-          • Upward trends may indicate issues needing attention{'\n'}
-          • Sudden changes should be reported to your care team{'\n'}
-          • Red values are outside safe ranges{'\n'}
-          • Keep tracking daily for accurate trends
+          • Rising weight (2+ lbs/day), BP, or temperature: contact your team right away{'\n'}
+          • Falling GFR or rising creatinine: call your coordinator{'\n'}
+          • Improving mood and sleep trends are great signs of recovery{'\n'}
+          • Red data points mean a value is outside your safe range{'\n'}
+          • Daily logging gives your care team better information
         </Text>
       </Card>
 

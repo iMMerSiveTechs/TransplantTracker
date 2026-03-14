@@ -121,18 +121,22 @@ export default function TodayScreen() {
         <Pressable onPress={() => router.push('/(tabs)/meds')}>
           <Card>
             <View style={styles.complianceRow}>
-              <Ring progress={medsTotal > 0 ? medsDone / medsTotal : 0} size={52} color={medsDone >= medsTotal ? colors.emerald500 : colors.indigo500}>
-                <Text style={styles.complianceRingText}>{medsDone}/{medsTotal}</Text>
+              <Ring progress={medsTotal > 0 ? medsDone / medsTotal : 0} size={60} color={medsDone >= medsTotal ? colors.emerald500 : colors.indigo500}>
+                <Text style={[styles.complianceRingText, medsDone >= medsTotal && styles.complianceRingDone]}>
+                  {medsDone >= medsTotal ? '✓' : `${medsDone}/${medsTotal}`}
+                </Text>
               </Ring>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={styles.complianceTitle}>
-                  {medsDone >= medsTotal ? 'All medications taken today ✓' : 'Medication Doses'}
+                  {medsDone >= medsTotal ? 'All done for today!' : "Today's Medications"}
                 </Text>
                 <Text style={styles.complianceSub}>
-                  {medsDone >= medsTotal ? 'Great job staying on track!' : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} remaining`}
+                  {medsDone >= medsTotal
+                    ? 'Great work staying on track'
+                    : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} still needed · tap to log`}
                 </Text>
               </View>
-              <Text style={styles.complianceArrow}>→</Text>
+              <Text style={styles.complianceArrow}>›</Text>
             </View>
           </Card>
         </Pressable>
@@ -263,7 +267,7 @@ export default function TodayScreen() {
         <SymCheck label="Decreased urination" checked={log.urineDown} onPress={() => upd('urineDown', !log.urineDown)} />
         <SymCheck label="Burning with urination" checked={log.burning} onPress={() => upd('burning', !log.burning)} />
         <View style={{ height: 12 }} />
-        <Text style={styles.painLabel}>Pain Level: {log.pain}/10</Text>
+        <Text style={styles.painLabel}>Pain Level (0 = none): {log.pain}/10</Text>
         <View style={styles.painScale}>
           {[...Array(11)].map((_, i) => (
             <Pressable
@@ -370,9 +374,10 @@ const styles = StyleSheet.create({
   painBtnTextActive: { color: colors.white },
   complianceRow: { flexDirection: 'row', alignItems: 'center' },
   complianceRingText: { fontSize: 11, fontWeight: '700', color: colors.slate700 },
+  complianceRingDone: { fontSize: 18, fontWeight: '800', color: colors.emerald700 },
   complianceTitle: { fontSize: 15, fontWeight: '700', color: colors.slate800 },
   complianceSub: { fontSize: 12, color: colors.slate500, marginTop: 2 },
-  complianceArrow: { fontSize: 18, color: colors.slate400 },
+  complianceArrow: { fontSize: 22, color: colors.slate400, fontWeight: '300' },
   wbLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.slate600, marginBottom: 8, marginTop: 12 },
   wbRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   wbBtn: { flex: 1, aspectRatio: 1, backgroundColor: colors.slate100, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.slate200 },
