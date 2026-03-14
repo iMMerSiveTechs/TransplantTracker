@@ -235,10 +235,10 @@ export default function MedsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.doseStatus}>
               {doseCount >= med.ppd
-                ? '✅ All done for today'
+                ? 'All doses logged today'
                 : doseCount === 0
-                  ? (med.ppd === 1 ? 'Not yet taken today' : `None taken · ${med.ppd} due today`)
-                  : `${doseCount} of ${med.ppd} taken · ${med.ppd - doseCount} more needed`}
+                  ? (med.ppd === 1 ? 'No dose logged today' : `No doses logged · ${med.ppd} required today`)
+                  : `${doseCount} of ${med.ppd} logged · ${med.ppd - doseCount} remaining`}
             </Text>
             {doseCount > 0 ? (
               <Text style={styles.lastDoseTime}>
@@ -246,7 +246,7 @@ export default function MedsScreen() {
               </Text>
             ) : null}
             {(streaks[med.id] ?? 0) >= 2 ? (
-              <Text style={styles.streakText}>🔥 {streaks[med.id]}-day streak</Text>
+              <Text style={styles.streakText}>{streaks[med.id]} consecutive days</Text>
             ) : null}
           </View>
           <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -514,5 +514,5 @@ const styles = StyleSheet.create({
   takeDoseBtnDoneText: { fontSize: 13, fontWeight: '700', color: colors.emerald700 },
   undoBtn: { paddingHorizontal: 6, paddingVertical: 10, justifyContent: 'center' },
   undoBtnText: { fontSize: 12, color: colors.slate400 },
-  streakText: { fontSize: 11, fontWeight: '600', color: colors.amber700, marginTop: 3 },
+  streakText: { fontSize: 11, color: colors.slate500, marginTop: 3 },
 });

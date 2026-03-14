@@ -128,12 +128,12 @@ export default function TodayScreen() {
               </Ring>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={styles.complianceTitle}>
-                  {medsDone >= medsTotal ? 'All done for today!' : "Today's Medications"}
+                  {medsDone >= medsTotal ? 'All required doses logged' : "Today's Medications"}
                 </Text>
                 <Text style={styles.complianceSub}>
                   {medsDone >= medsTotal
-                    ? 'Great work staying on track'
-                    : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} still needed · tap to log`}
+                    ? 'Adherence complete for today'
+                    : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} remaining · tap to log`}
                 </Text>
               </View>
               <Text style={styles.complianceArrow}>›</Text>
