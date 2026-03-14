@@ -127,16 +127,14 @@ export default function TodayScreen() {
                 </Text>
               </Ring>
               <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={styles.complianceTitle}>
-                  {medsDone >= medsTotal ? 'All required doses logged' : "Today's Medications"}
-                </Text>
+                <Text style={styles.complianceTitle}>Today's Adherence</Text>
                 <Text style={styles.complianceSub}>
                   {medsDone >= medsTotal
-                    ? 'Adherence complete for today'
-                    : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} remaining · tap to log`}
+                    ? 'All required doses logged'
+                    : `${medsTotal - medsDone} dose${medsTotal - medsDone === 1 ? '' : 's'} remaining`}
                 </Text>
               </View>
-              <Text style={styles.complianceArrow}>›</Text>
+              <Text style={styles.complianceCta}>Open{'\n'}Medications</Text>
             </View>
           </Card>
         </Pressable>
@@ -377,7 +375,7 @@ const styles = StyleSheet.create({
   complianceRingDone: { fontSize: 18, fontWeight: '800', color: colors.emerald700 },
   complianceTitle: { fontSize: 15, fontWeight: '700', color: colors.slate800 },
   complianceSub: { fontSize: 12, color: colors.slate500, marginTop: 2 },
-  complianceArrow: { fontSize: 22, color: colors.slate400, fontWeight: '300' },
+  complianceCta: { fontSize: 10, fontWeight: '600', color: colors.indigo500, textAlign: 'right', lineHeight: 15 },
   wbLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.slate600, marginBottom: 8, marginTop: 12 },
   wbRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   wbBtn: { flex: 1, aspectRatio: 1, backgroundColor: colors.slate100, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.slate200 },
