@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { INIT_MEDS } from '@/data/restrictions';
 import { CL_LIMITS } from '@/data/clinicalLimits';
@@ -33,13 +34,14 @@ export default function MedsScreen() {
 
   // Dose adherence state
   const [todayDoses, setTodayDoses] = useState<MedDose[]>([]);
-  const todayKey = `doses_${toId(new Date())}`;
+  // Always compute the key at call time so midnight rollovers use the correct date
+  const getTodayKey = () => `doses_${toId(new Date())}`;
 
   useEffect(() => {
     async function load() {
       const savedMeds = await S.get('medications');
       if (savedMeds) setMeds(savedMeds);
-      const doses = await S.get(todayKey);
+      const doses = await S.get(getTodayKey());
       if (doses) setTodayDoses(doses);
       setLoaded(true);
     }
@@ -63,7 +65,7 @@ export default function MedsScreen() {
     const dose: MedDose = { medId: med.id, timestamp: Date.now() };
     const updated = [...todayDoses, dose];
     setTodayDoses(updated);
-    await S.set(todayKey, updated);
+    await S.set(getTodayKey(), updated);
     // Auto-decrement inventory by 1
     setMeds(prev => prev.map(m => m.id === med.id ? { ...m, inv: Math.max(0, m.inv - 1) } : m));
   };
@@ -74,14 +76,17 @@ export default function MedsScreen() {
     const realIdx = todayDoses.length - 1 - idx;
     const updated = todayDoses.filter((_, i) => i !== realIdx);
     setTodayDoses(updated);
-    await S.set(todayKey, updated);
+    await S.set(getTodayKey(), updated);
     // Restore 1 pill
     setMeds(prev => prev.map(m => m.id === medId ? { ...m, inv: m.inv + 1 } : m));
   };
 
   const toggleNotify = async (med: Medication) => {
     const hasPermission = await requestNotificationPermission();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      Burnt.toast({ title: 'Notification permission required', preset: 'error' });
+      return;
+    }
     const newEnabled = !med.notifyEnabled;
     const updated = meds.map(m =>
       m.id === med.id ? { ...m, notifyEnabled: newEnabled } : m
@@ -95,6 +100,11 @@ export default function MedsScreen() {
   };
 
   const setReminderTime = async (med: Medication, date: Date) => {
+    const hasPermission = await requestNotificationPermission();
+    if (!hasPermission) {
+      Burnt.toast({ title: 'Notification permission required', preset: 'error' });
+      return;
+    }
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     const reminderTime = `${hours}:${minutes}`;
@@ -102,7 +112,6 @@ export default function MedsScreen() {
       m.id === med.id ? { ...m, reminderTime, notifyEnabled: true } : m
     );
     setMeds(updated);
-    await requestNotificationPermission();
     await scheduleMedReminder({ ...med, reminderTime, notifyEnabled: true });
   };
 
