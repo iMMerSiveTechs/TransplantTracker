@@ -59,12 +59,19 @@ function medRows(meds: Medication[]): string {
 
 async function adherenceRows(meds: Medication[], days: Date[]): Promise<string> {
   if (!meds.length) return '<tr><td colspan="3" style="text-align:center;color:#888;">No medications tracked</td></tr>';
+  // Batch-load all days in parallel to avoid sequential storage calls (N×M → N)
+  const dayDosesMap = new Map<string, MedDose[]>();
+  await Promise.all(days.map(async d => {
+    const key = toId(d);
+    const doses: MedDose[] = (await S.get(`doses_${key}`)) ?? [];
+    dayDosesMap.set(key, doses);
+  }));
   const rows: string[] = [];
   for (const med of meds) {
     let taken = 0;
     let total = 0;
     for (const d of days) {
-      const doses: MedDose[] = (await S.get(`doses_${toId(d)}`)) ?? [];
+      const doses = dayDosesMap.get(toId(d)) ?? [];
       const count = doses.filter(dose => dose.medId === med.id).length;
       taken += Math.min(count, med.ppd);
       total += med.ppd;

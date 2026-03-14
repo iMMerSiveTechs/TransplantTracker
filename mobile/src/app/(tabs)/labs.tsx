@@ -89,18 +89,28 @@ export default function LabsScreen() {
         <>
           <SectionLabel title="Imported Files" />
           <Card>
-            {imports.map(imp => (
-              <View key={imp.id} style={styles.importRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.importName} numberOfLines={1}>{imp.filename}</Text>
-                  <Text style={styles.importDate}>{imp.date}</Text>
+            {imports.map(imp => {
+              const isPdf = imp.filename.toLowerCase().endsWith('.pdf');
+              const fileType = isPdf ? 'PDF' : 'Image';
+              const fileVariant = isPdf ? 'info' : 'success';
+              const importedDate = imp.date
+                ? new Date(imp.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                : '—';
+              return (
+                <View key={imp.id} style={styles.importRow}>
+                  <Text style={styles.importIcon}>{isPdf ? '📄' : '🖼️'}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.importName} numberOfLines={1}>{imp.filename}</Text>
+                    <Text style={styles.importDate}>Saved {importedDate}</Text>
+                  </View>
+                  <Badge label={fileType} variant={fileVariant} />
+                  <Pressable style={styles.importRemove} onPress={() => removeImport(imp.id)}>
+                    <Text style={styles.importRemoveText}>✕</Text>
+                  </Pressable>
                 </View>
-                <Badge label="Not parsed" variant="muted" />
-                <Pressable style={styles.importRemove} onPress={() => removeImport(imp.id)}>
-                  <Text style={styles.importRemoveText}>✕</Text>
-                </Pressable>
-              </View>
-            ))}
+              );
+            })}
+            <Text style={styles.importNote}>Files are saved for reference. Enter lab values manually above.</Text>
           </Card>
         </>
       ) : null}
@@ -266,7 +276,7 @@ export default function LabsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: 16 },
-  header: { marginBottom: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   title: { fontSize: 24, fontWeight: '700', color: colors.slate800 },
   subtitle: { fontSize: 14, color: colors.slate500, marginTop: 2 },
   labRow: { flexDirection: 'row', alignItems: 'flex-end' },
@@ -281,4 +291,6 @@ const styles = StyleSheet.create({
   importDate: { fontSize: 11, color: colors.slate400, marginTop: 2 },
   importRemove: { padding: 6 },
   importRemoveText: { fontSize: 14, color: colors.slate400 },
+  importIcon: { fontSize: 20, marginRight: 8 },
+  importNote: { fontSize: 11, color: colors.slate400, marginTop: 10, fontStyle: 'italic' },
 });

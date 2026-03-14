@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { colors } from '@/data/colors';
 import { EMPTY_LOG, type DailyLog, type MedDose, type Medication } from '@/data/types';
 import { CL_LIMITS } from '@/data/clinicalLimits';
@@ -11,7 +11,6 @@ import NumberField from '@/components/NumberField';
 import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
 import SymCheck from '@/components/SymCheck';
-import BigCheck from '@/components/BigCheck';
 import TacTimer from '@/components/TacTimer';
 import Alrt from '@/components/Alert';
 import Ring from '@/components/Ring';
@@ -29,22 +28,27 @@ export default function TodayScreen() {
   const surgDate = profile?.surgDate ? new Date(profile.surgDate) : SURG_DEFAULT;
   const daysSince = dBt(surgDate, today);
 
+  const loadMedCompliance = useCallback(async () => {
+    const meds: Medication[] = (await S.get('medications')) ?? [];
+    const doses: MedDose[] = (await S.get(`doses_${todayId}`)) ?? [];
+    const total = meds.reduce((sum, m) => sum + m.ppd, 0);
+    const done = meds.reduce((sum, m) => {
+      const taken = doses.filter(d => d.medId === m.id).length;
+      return sum + Math.min(taken, m.ppd);
+    }, 0);
+    setMedsTotal(total);
+    setMedsDone(done);
+  }, [todayId]);
+
+  // Refresh compliance ring whenever the Today tab is focused (e.g. after taking a dose on Meds tab)
+  useFocusEffect(useCallback(() => { loadMedCompliance(); }, [loadMedCompliance]));
+
   useEffect(() => {
     async function load() {
       const savedLog = await S.get(`log_${todayId}`);
       const savedProfile = await S.get('profile');
       if (savedLog) setLog(savedLog);
       if (savedProfile) setProfile(savedProfile);
-      // Load med compliance
-      const meds: Medication[] = (await S.get('medications')) ?? [];
-      const doses: MedDose[] = (await S.get(`doses_${todayId}`)) ?? [];
-      const total = meds.reduce((sum, m) => sum + m.ppd, 0);
-      const done = meds.reduce((sum, m) => {
-        const taken = doses.filter(d => d.medId === m.id).length;
-        return sum + Math.min(taken, m.ppd);
-      }, 0);
-      setMedsTotal(total);
-      setMedsDone(done);
       setLoaded(true);
     }
     load();
@@ -225,20 +229,6 @@ export default function TodayScreen() {
         </View>
       </Card>
 
-      {/* Medications */}
-      <SectionLabel title="Medications Taken" />
-      <Card>
-        <View style={styles.medRow}>
-          <Text style={styles.medLabel}>Morning Meds</Text>
-          <BigCheck checked={log.amMeds} onPress={() => upd('amMeds', !log.amMeds)} />
-        </View>
-        <View style={{ height: 16 }} />
-        <View style={styles.medRow}>
-          <Text style={styles.medLabel}>Evening Meds</Text>
-          <BigCheck checked={log.pmMeds} onPress={() => upd('pmMeds', !log.pmMeds)} />
-        </View>
-      </Card>
-
       {/* Fluid Intake */}
       <SectionLabel title="Fluid Intake" sub={`Goal: ${CL_LIMITS.fluidGoal} mL/day`} />
       <Card>
@@ -373,8 +363,8 @@ const styles = StyleSheet.create({
   fluidBtn: { flex: 1, backgroundColor: colors.indigo500, paddingVertical: 12, borderRadius: 12, alignItems: 'center' },
   fluidBtnText: { fontSize: 14, fontWeight: '600', color: colors.white },
   painLabel: { fontSize: 12, fontWeight: '600', color: colors.slate600, marginBottom: 8 },
-  painScale: { flexDirection: 'row', gap: 4 },
-  painBtn: { flex: 1, aspectRatio: 1, backgroundColor: colors.slate100, borderRadius: 8, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.slate200 },
+  painScale: { flexDirection: 'row', gap: 3 },
+  painBtn: { flex: 1, paddingVertical: 8, backgroundColor: colors.slate100, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.slate200 },
   painBtnActive: { backgroundColor: colors.rose500, borderColor: colors.rose500 },
   painBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate600 },
   painBtnTextActive: { color: colors.white },

@@ -63,7 +63,7 @@ export default function MedsScreen() {
       const todayTaken = (todayD as MedDose[] | null)?.some(d => d.medId === med.id) ?? false;
       if (!todayTaken) day = addD(day, -1);
       // Count consecutive past days
-      for (let i = 0; i < 365; i++) {
+      for (let i = 0; i < 90; i++) {
         const key = `doses_${toId(day)}`;
         const doses = i === 0 && todayTaken ? todayD : await S.get(key);
         const taken = (doses as MedDose[] | null)?.some(d => d.medId === med.id) ?? false;
@@ -207,6 +207,7 @@ export default function MedsScreen() {
     const warning = getLowStockWarning(med);
     const daysLeft = Math.floor(med.inv / med.ppd);
     const progressPct = (daysLeft / 30) * 100;
+    const doseCount = dosesTodayForMed(med.id);
 
     return (
       <Card key={med.id} accent={med.color}>
@@ -234,20 +235,20 @@ export default function MedsScreen() {
           <View style={{ flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text style={styles.doseStatus}>
-                {dosesTodayForMed(med.id) >= med.ppd ? '✅ All doses taken' : `${dosesTodayForMed(med.id)}/${med.ppd} doses today`}
+                {doseCount >= med.ppd ? '✅ All doses taken' : `${doseCount}/${med.ppd} doses today`}
               </Text>
               {(streaks[med.id] ?? 0) > 0 ? (
                 <Badge label={`🔥 ${streaks[med.id]}d streak`} variant="success" />
               ) : null}
             </View>
-            {dosesTodayForMed(med.id) > 0 ? (
+            {doseCount > 0 ? (
               <Text style={styles.lastDoseTime}>
-                Last: {new Date(todayDoses.filter(d => d.medId === med.id).slice(-1)[0]?.timestamp ?? 0).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                Last: {new Date(todayDoses.filter(d => d.medId === med.id).slice(-1)[0]!.timestamp).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
               </Text>
             ) : null}
           </View>
           <View style={{ flexDirection: 'row', gap: 8 }}>
-            {dosesTodayForMed(med.id) < med.ppd ? (
+            {doseCount < med.ppd ? (
               <Pressable style={styles.takeDoseBtn} onPress={() => takeDose(med)}>
                 <Text style={styles.takeDoseBtnText}>💊 Take Dose</Text>
               </Pressable>
@@ -256,7 +257,7 @@ export default function MedsScreen() {
                 <Text style={styles.takeDoseBtnDoneText}>Done ✓</Text>
               </Pressable>
             )}
-            {dosesTodayForMed(med.id) > 0 ? (
+            {doseCount > 0 ? (
               <Pressable style={styles.undoBtn} onPress={() => undoLastDose(med.id)}>
                 <Text style={styles.undoBtnText}>Undo</Text>
               </Pressable>

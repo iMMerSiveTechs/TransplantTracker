@@ -222,7 +222,7 @@ export default function HistoryScreen() {
           unit="/5"
           color={colors.amber500}
         />
-        <Text style={styles.chartNote}>Track mood, sleep, and stress patterns over time</Text>
+        <Text style={styles.chartNote}>Higher mood and sleep scores are better (1–5). Lower stress is better. Gaps mean no entry that day.</Text>
       </Card>
 
       {/* Info */}
