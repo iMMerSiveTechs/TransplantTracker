@@ -62,5 +62,8 @@ export function fastTn(): boolean {
   return !!getLabType(addD(new Date(), 1));
 }
 
-// Fallback for users who haven't set their surgery date yet
-export const SURG_DEFAULT = new Date();
+// Fallback for users who haven't set their surgery date yet.
+// Returned as a function so each call gets the current date rather than
+// the date the module was first loaded (which could be days ago if the app
+// was left running across midnight).
+export const getSurgDefault = (): Date => new Date();

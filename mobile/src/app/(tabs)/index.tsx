@@ -4,7 +4,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { colors } from '@/data/colors';
 import { EMPTY_LOG, type DailyLog, type MedDose, type Medication } from '@/data/types';
 import { CL_LIMITS } from '@/data/clinicalLimits';
-import { toId, fmtDate, greet, dBt, SURG_DEFAULT } from '@/utils/dates';
+import { toId, fmtDate, greet, dBt, getSurgDefault } from '@/utils/dates';
 import S from '@/utils/storage';
 import Card from '@/components/Card';
 import NumberField from '@/components/NumberField';
@@ -20,6 +20,8 @@ export default function TodayScreen() {
   const [loaded, setLoaded] = useState<boolean>(false);
   // Track whether we've received real data from storage (or confirmed it's absent)
   const [logFromStorage, setLogFromStorage] = useState<boolean>(false);
+  // Track the date key the log was loaded for — used to detect midnight rollovers
+  const [loadedDateKey, setLoadedDateKey] = useState<string>('');
   const [profile, setProfile] = useState<any>(null);
   const [medsDone, setMedsDone] = useState<number>(0);
   const [medsTotal, setMedsTotal] = useState<number>(0);
@@ -27,12 +29,13 @@ export default function TodayScreen() {
 
   const today = new Date();
   const todayId = toId(today);
-  const surgDate = profile?.surgDate ? new Date(profile.surgDate) : SURG_DEFAULT;
+  const surgDate = profile?.surgDate ? new Date(profile.surgDate) : getSurgDefault();
   const daysSince = dBt(surgDate, today);
 
   const loadMedCompliance = useCallback(async () => {
+    const currentId = toId(new Date());
     const meds: Medication[] = (await S.get('medications')) ?? [];
-    const doses: MedDose[] = (await S.get(`doses_${todayId}`)) ?? [];
+    const doses: MedDose[] = (await S.get(`doses_${currentId}`)) ?? [];
     const total = meds.reduce((sum, m) => sum + m.ppd, 0);
     const done = meds.reduce((sum, m) => {
       const taken = doses.filter(d => d.medId === m.id).length;
@@ -40,33 +43,53 @@ export default function TodayScreen() {
     }, 0);
     setMedsTotal(total);
     setMedsDone(done);
-  }, [todayId]);
+  }, []);
 
-  // Refresh compliance ring whenever the Today tab is focused (e.g. after taking a dose on Meds tab)
-  useFocusEffect(useCallback(() => { loadMedCompliance(); }, [loadMedCompliance]));
+  const loadDayLog = useCallback(async () => {
+    const currentId = toId(new Date());
+    const savedLog = await S.get(`log_${currentId}`);
+    if (savedLog) {
+      setLog(savedLog);
+      setLogFromStorage(true);
+    } else {
+      setLog(EMPTY_LOG);
+      setLogFromStorage(false);
+    }
+    setLoadedDateKey(currentId);
+    setLoaded(true);
+  }, []);
 
+  // On initial mount: load today's log and profile
   useEffect(() => {
     async function load() {
-      const savedLog = await S.get(`log_${todayId}`);
       const savedProfile = await S.get('profile');
-      if (savedLog) {
-        setLog(savedLog);
-        setLogFromStorage(true);
-      }
       if (savedProfile) setProfile(savedProfile);
-      setLoaded(true);
+      await loadDayLog();
     }
     load();
   }, []);
+
+  // On focus: refresh med compliance ring and reload log if day has rolled over
+  useFocusEffect(useCallback(() => {
+    loadMedCompliance();
+    const currentId = toId(new Date());
+    if (loadedDateKey && loadedDateKey !== currentId) {
+      loadDayLog();
+    }
+  }, [loadMedCompliance, loadDayLog, loadedDateKey]));
 
   useEffect(() => {
     // Only persist if the user has made a change (log was modified after initial load,
     // or we have confirmed there is no prior data and the user entered something).
     // Never overwrite storage with EMPTY_LOG just because storage returned null.
     if (!loaded) return;
+    const currentId = toId(new Date());
+    // Do not write yesterday's data to today's key after a midnight rollover.
+    // The save is safe once loadedDateKey matches the current day.
+    if (loadedDateKey && loadedDateKey !== currentId) return;
     const isEmpty = JSON.stringify(log) === JSON.stringify(EMPTY_LOG);
     if (!logFromStorage && isEmpty) return;
-    S.set(`log_${todayId}`, log);
+    S.set(`log_${currentId}`, log);
   }, [log, loaded]);
 
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });

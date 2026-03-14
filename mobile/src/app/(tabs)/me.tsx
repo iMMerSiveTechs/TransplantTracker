@@ -4,7 +4,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { RESTS, TRANSPLANT_TYPES } from '@/data/restrictions';
-import { dBt, wBt, fmtDate, toId, SURG_DEFAULT } from '@/utils/dates';
+import { dBt, wBt, fmtDate, toId, getSurgDefault } from '@/utils/dates';
 import S from '@/utils/storage';
 import Card from '@/components/Card';
 import SectionLabel from '@/components/SectionLabel';
@@ -89,7 +89,7 @@ export default function MeScreen() {
   const [aDesc, setADesc] = useState<string>('');
 
   const today = new Date();
-  const surgDate = profile?.surgDate ? new Date(profile.surgDate) : SURG_DEFAULT;
+  const surgDate = profile?.surgDate ? new Date(profile.surgDate) : getSurgDefault();
   const daysSince = dBt(surgDate, today);
   const weeksSince = wBt(surgDate, today);
   const transplantType = profile?.type || 'Kidney';

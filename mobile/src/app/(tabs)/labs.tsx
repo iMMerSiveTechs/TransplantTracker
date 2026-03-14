@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { colors } from '@/data/colors';
 import { LAB_R, labClr } from '@/data/labTests';
@@ -16,26 +17,43 @@ export default function LabsScreen() {
   const [log, setLog] = useState<DailyLog>(EMPTY_LOG);
   const [loaded, setLoaded] = useState<boolean>(false);
   const [logFromStorage, setLogFromStorage] = useState<boolean>(false);
+  // Track which date key was loaded to detect midnight rollovers
+  const [loadedDateKey, setLoadedDateKey] = useState<string>('');
   const [imports, setImports] = useState<LabImport[]>([]);
 
-  const today = new Date();
-  const todayId = toId(today);
+  const loadDayLog = useCallback(async () => {
+    const currentId = toId(new Date());
+    const savedLog = await S.get(`log_${currentId}`);
+    if (savedLog) {
+      setLog(savedLog);
+      setLogFromStorage(true);
+    } else {
+      setLog(EMPTY_LOG);
+      setLogFromStorage(false);
+    }
+    setLoadedDateKey(currentId);
+    setLoaded(true);
+  }, []);
 
   useEffect(() => {
     async function load() {
-      const savedLog = await S.get(`log_${todayId}`);
       const savedImports = await S.get('lab_imports');
-      if (savedLog) {
-        setLog(savedLog);
-        setLogFromStorage(true);
-      }
       if (savedImports) setImports(savedImports);
-      setLoaded(true);
+      await loadDayLog();
     }
     load();
   }, []);
 
+  // Reload if day has rolled over since the log was last loaded
+  useFocusEffect(useCallback(() => {
+    const currentId = toId(new Date());
+    if (loadedDateKey && loadedDateKey !== currentId) {
+      loadDayLog();
+    }
+  }, [loadedDateKey, loadDayLog]));
+
   const pickLabFile = async () => {
+    const currentId = toId(new Date());
     const result = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'image/*'],
       copyToCacheDirectory: true,
@@ -44,7 +62,7 @@ export default function LabsScreen() {
     const asset = result.assets[0];
     const newImport: LabImport = {
       id: `lab_${Date.now()}`,
-      date: todayId,
+      date: currentId,
       filename: asset.name,
       uri: asset.uri,
       parsed: false,
@@ -62,9 +80,12 @@ export default function LabsScreen() {
 
   useEffect(() => {
     if (!loaded) return;
+    const currentId = toId(new Date());
+    // Do not write stale data to a new day's key after a midnight rollover.
+    if (loadedDateKey && loadedDateKey !== currentId) return;
     const isEmpty = JSON.stringify(log) === JSON.stringify(EMPTY_LOG);
     if (!logFromStorage && isEmpty) return;
-    S.set(`log_${todayId}`, log);
+    S.set(`log_${currentId}`, log);
   }, [log, loaded]);
 
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });
