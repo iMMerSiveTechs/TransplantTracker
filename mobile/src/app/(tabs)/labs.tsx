@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { colors } from '@/data/colors';
 import { LAB_R, labClr } from '@/data/labTests';
 import { toId } from '@/utils/dates';
@@ -25,7 +26,9 @@ export default function LabsScreen() {
     const currentId = toId(new Date());
     const savedLog = await S.get(`log_${currentId}`);
     if (savedLog) {
-      setLog(savedLog);
+      // Merge with EMPTY_LOG so any fields added in later versions have safe defaults
+      // for users upgrading from older app builds with missing fields in storage.
+      setLog({ ...EMPTY_LOG, ...savedLog });
       setLogFromStorage(true);
     } else {
       setLog(EMPTY_LOG);
@@ -49,6 +52,8 @@ export default function LabsScreen() {
     loadDayLog();
   }, [loadDayLog]));
 
+  const LAB_DIR = `${FileSystem.documentDirectory}lab_attachments/`;
+
   const pickLabFile = async () => {
     const currentId = toId(new Date());
     const result = await DocumentPicker.getDocumentAsync({
@@ -57,11 +62,16 @@ export default function LabsScreen() {
     });
     if (result.canceled || !result.assets?.length) return;
     const asset = result.assets[0];
+    // Copy from ephemeral cache to durable document directory so the file
+    // survives app restarts and OS cache eviction.
+    await FileSystem.makeDirectoryAsync(LAB_DIR, { intermediates: true });
+    const destUri = `${LAB_DIR}lab_${Date.now()}_${asset.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    await FileSystem.copyAsync({ from: asset.uri, to: destUri });
     const newImport: LabImport = {
       id: `lab_${Date.now()}`,
       date: currentId,
       filename: asset.name,
-      uri: asset.uri,
+      uri: destUri,
       parsed: false,
     };
     const updated = [...imports, newImport];
@@ -70,6 +80,11 @@ export default function LabsScreen() {
   };
 
   const removeImport = async (id: string) => {
+    const toRemove = imports.find(i => i.id === id);
+    // Delete the durable file to avoid storage accumulation
+    if (toRemove?.uri?.includes('lab_attachments')) {
+      try { await FileSystem.deleteAsync(toRemove.uri, { idempotent: true }); } catch {}
+    }
     const updated = imports.filter(i => i.id !== id);
     setImports(updated);
     await S.set('lab_imports', updated);

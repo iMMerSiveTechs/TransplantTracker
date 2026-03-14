@@ -48,7 +48,9 @@ export default function TodayScreen() {
     const currentId = toId(new Date());
     const savedLog = await S.get(`log_${currentId}`);
     if (savedLog) {
-      setLog(savedLog);
+      // Merge with EMPTY_LOG so fields added in later app versions have safe defaults
+      // for users whose old storage is missing those fields.
+      setLog({ ...EMPTY_LOG, ...savedLog });
       setLogFromStorage(true);
     } else {
       setLog(EMPTY_LOG);

@@ -406,11 +406,11 @@ export default function MedsScreen() {
       <View style={{ height: 40 }} />
 
       {/* Add/Edit Modal */}
-      <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAddModal(false)}>
+      <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAddModal(false)} accessibilityViewIsModal>
         <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{editingMed ? 'Edit Medication' : 'Add Medication'}</Text>
-            <Pressable onPress={() => setShowAddModal(false)}>
+            <Pressable onPress={() => setShowAddModal(false)} accessibilityLabel="Close medication form">
               <Text style={styles.modalClose}>✕</Text>
             </Pressable>
           </View>

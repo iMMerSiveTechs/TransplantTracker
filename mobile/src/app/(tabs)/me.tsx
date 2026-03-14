@@ -449,11 +449,11 @@ export default function MeScreen() {
       <View style={{ height: 40 }} />
 
       {/* Contact Modal */}
-      <Modal visible={showContactModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowContactModal(false)}>
+      <Modal visible={showContactModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowContactModal(false)} accessibilityViewIsModal>
         <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{editingContactIdx >= 0 ? 'Edit Contact' : 'Add Contact'}</Text>
-            <Pressable onPress={() => setShowContactModal(false)}>
+            <Pressable onPress={() => setShowContactModal(false)} accessibilityLabel="Close contact form">
               <Text style={styles.modalClose}>✕</Text>
             </Pressable>
           </View>
@@ -499,11 +499,11 @@ export default function MeScreen() {
       </Modal>
 
       {/* Profile Edit Modal */}
-      <Modal visible={showProfileEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProfileEdit(false)}>
+      <Modal visible={showProfileEdit} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowProfileEdit(false)} accessibilityViewIsModal>
         <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit Profile</Text>
-            <Pressable onPress={() => setShowProfileEdit(false)}>
+            <Pressable onPress={() => setShowProfileEdit(false)} accessibilityLabel="Close profile editor">
               <Text style={styles.modalClose}>✕</Text>
             </Pressable>
           </View>
@@ -561,11 +561,11 @@ export default function MeScreen() {
       </Modal>
 
       {/* Appointment Modal */}
-      <Modal visible={showApptModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowApptModal(false)}>
+      <Modal visible={showApptModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowApptModal(false)} accessibilityViewIsModal>
         <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{editingApptId ? 'Edit Appointment' : 'Add Appointment'}</Text>
-            <Pressable onPress={() => setShowApptModal(false)}>
+            <Pressable onPress={() => setShowApptModal(false)} accessibilityLabel="Close appointment form">
               <Text style={styles.modalClose}>✕</Text>
             </Pressable>
           </View>

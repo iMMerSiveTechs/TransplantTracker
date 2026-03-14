@@ -205,13 +205,58 @@
 
 ---
 
+## BLOCK 13 — Notification Lifecycle (Physical Device Required)
+
+| # | Test | Expected | Pass/Fail |
+|---|------|----------|-----------|
+| 13.1 | Enable reminder on Tacrolimus, set 1 min in future → kill app → wait | Notification fires with correct med name and body | ☐ |
+| 13.2 | Enable reminder → edit med name → wait for reminder time | Notification fires with NEW name (not old name) | ☐ |
+| 13.3 | Enable reminder → delete med → wait for reminder time | Notification does NOT fire | ☐ |
+| 13.4 | Enable reminder → toggle Off → wait for reminder time | Notification does NOT fire | ☐ |
+| 13.5 | Open app Settings → revoke notification permission → enable reminder in app | Toast appears: "Notification permission required" | ☐ |
+| 13.6 | Enable 2 reminders on 2 different meds | Both fire independently at correct times | ☐ |
+
+---
+
+## BLOCK 14 — Attachment Durability
+
+| # | Test | Expected | Pass/Fail |
+|---|------|----------|-----------|
+| 14.1 | Attach a PDF → note filename → force-kill app → reopen → Labs tab | File still listed with correct name | ☐ |
+| 14.2 | Attach a PDF → reopen app → remove it | File removed from list, no crash | ☐ |
+| 14.3 | Attach image file (.jpg or .png) | Image appears with 🖼️ icon, not PDF icon | ☐ |
+| 14.4 | Attach multiple files | All appear in list, all persist after kill/reopen | ☐ |
+
+---
+
+## BLOCK 15 — Upgrade / Migration
+
+| # | Test | Expected | Pass/Fail |
+|---|------|----------|-----------|
+| 15.1 | Open app with data from an older build (missing mood/sleep fields) | Today tab loads without crash; missing fields show empty (not crash) | ☐ |
+| 15.2 | Open app with meds missing notifyEnabled field (older format) | Meds tab loads, no crash, reminder toggle shows Off | ☐ |
+
+---
+
+## BLOCK 16 — VoiceOver Critical Flows
+
+| # | Test | Expected | Pass/Fail |
+|---|------|----------|-----------|
+| 16.1 | Enable VoiceOver → open any modal (Add Contact, Edit Profile, etc.) | VoiceOver focus stays inside modal; cannot reach content behind it | ☐ |
+| 16.2 | VoiceOver → modal ✕ close button | Reads descriptive label (e.g. "Close contact form") not just "button" | ☐ |
+| 16.3 | VoiceOver → Meds tab → Log Dose button | Reads "Log dose for [med name]" | ☐ |
+| 16.4 | VoiceOver → Labs tab → Attach button | Reads "Attach" or similar | ☐ |
+
+---
+
 ## Release Gate Criteria
 
 All items in Blocks 1–6 and 8 must PASS before submission.
 Block 7 (History): minimum 3/5 must pass.
 Block 9 (Rollover): must test manually with clock advancement.
-Block 11 (Accessibility): items 11.1–11.4 are required.
+Block 11 (Accessibility): items 11.1–11.4 and 16.1–16.2 are required.
 Block 12 (Privacy): all required — these protect the app's medical credibility.
+Block 13 (Notifications): items 13.1–13.4 required (physical device).
 
 **DO NOT submit if any of these have known failures:**
 - 2.2 (data persistence after kill)
@@ -222,3 +267,6 @@ Block 12 (Privacy): all required — these protect the app's medical credibility
 - 6.7 (no misleading lab import language)
 - 8.7 (export doesn't crash with no data)
 - 12.3 (no diagnosis claims in UI)
+- 13.1 (notification fires while app closed)
+- 13.3 (notification canceled on delete)
+- 16.1 (VoiceOver modal trap)
