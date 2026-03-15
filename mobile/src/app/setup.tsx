@@ -49,7 +49,7 @@ export default function SetupScreen() {
     const profile: Profile = {
       name,
       type: transplantType,
-      surgDate,
+      surgDate: surgDate.toISOString().split('T')[0],
       contacts,
       emergPhone: '911',
     };

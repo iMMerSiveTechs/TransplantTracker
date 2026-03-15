@@ -26,7 +26,7 @@ function addD(base: Date, days: number): Date {
 const DEMO_PROFILE: Profile = {
   name: 'Alex Chen',
   type: 'Kidney',
-  surgDate: addD(new Date(), -90) as unknown as Date,
+  surgDate: addD(new Date(), -90).toISOString().split('T')[0],
   contacts: [
     { label: 'Transplant Coordinator', sub: 'UCSF Transplant Center', phone: '(415) 555-0100', icon: '👨‍⚕️', urgent: true },
     { label: 'Transplant Pharmacy', sub: 'UCSF Pharmacy', phone: '(415) 555-0200', icon: '💊', urgent: false },
@@ -44,7 +44,6 @@ function buildSampleLog(dayOffset: number): DailyLog {
     amSys: '118', amDia: '76', amHr: '72',
     pmSys: '122', pmDia: '78', pmHr: '74',
     fluidMl: 2200 + dayOffset * 50,
-    amMeds: true, pmMeds: true,
     nausea: false, incision: false, urineDown: false, burning: false,
     pain: 1, mood: 4, sleepQuality: 3, stressLevel: 2,
     wellbeingNotes: 'Feeling good today. Energy improving.',

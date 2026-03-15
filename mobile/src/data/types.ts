@@ -19,10 +19,8 @@ export interface DailyLog {
   bloating: boolean;
   diarrhea: boolean;
   constipation: boolean;
-  appetite: "poor" | "reduced" | "normal" | "good";
   tenderness: boolean;
   swelling: boolean;
-  notes: string;
   labCr: string;
   labTac: string;
   labGfr: string;
@@ -42,9 +40,9 @@ export const EMPTY_LOG: DailyLog = {
   pmTemp: "", pmSys: "", pmDia: "", pmHr: "",
   fluidMl: 0,
   incision: false, nausea: false, urineDown: false, burning: false, pain: 0,
-  acidReflux: false, gas: false, bloating: false, diarrhea: false, constipation: false, appetite: "normal",
+  acidReflux: false, gas: false, bloating: false, diarrhea: false, constipation: false,
   tenderness: false, swelling: false,
-  notes: "", labCr: "", labTac: "", labGfr: "", labPhos: "", labK: "", labGlu: "", lastTacTime: null,
+  labCr: "", labTac: "", labGfr: "", labPhos: "", labK: "", labGlu: "", lastTacTime: null,
   mood: 0, sleepQuality: 0, stressLevel: 0, wellbeingNotes: "",
 };
 
@@ -75,7 +73,7 @@ export interface Contact {
 export interface Profile {
   name: string;
   type: string;
-  surgDate: Date;
+  surgDate: string; // ISO 8601 date string "YYYY-MM-DD"
   contacts: Contact[];
   emergPhone: string;
 }

@@ -25,10 +25,10 @@ function vitalsRows(logs: { date: Date; log: DailyLog | null }[]): string {
       return `
         <tr>
           <td>${p.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-          <td>${l.weight || '—'}</td>
-          <td>${l.amTemp || '—'} / ${l.pmTemp || '—'}</td>
-          <td>${l.amSys ? `${l.amSys}/${l.amDia}` : '—'} / ${l.pmSys ? `${l.pmSys}/${l.pmDia}` : '—'}</td>
-          <td>${l.amHr || '—'} / ${l.pmHr || '—'}</td>
+          <td>${esc(l.weight) || '—'}</td>
+          <td>${esc(l.amTemp) || '—'} / ${esc(l.pmTemp) || '—'}</td>
+          <td>${l.amSys ? `${esc(l.amSys)}/${esc(l.amDia)}` : '—'} / ${l.pmSys ? `${esc(l.pmSys)}/${esc(l.pmDia)}` : '—'}</td>
+          <td>${esc(l.amHr) || '—'} / ${esc(l.pmHr) || '—'}</td>
           <td>${l.fluidMl ? `${l.fluidMl} mL` : '—'}</td>
         </tr>`;
     }).join('');
@@ -43,12 +43,12 @@ function labRows(logs: { date: Date; log: DailyLog | null }[]): string {
       return `
         <tr>
           <td>${p.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
-          <td>${l.labCr || '—'}</td>
-          <td>${l.labTac || '—'}</td>
-          <td>${l.labGfr || '—'}</td>
-          <td>${l.labPhos || '—'}</td>
-          <td>${l.labK || '—'}</td>
-          <td>${l.labGlu || '—'}</td>
+          <td>${esc(l.labCr) || '—'}</td>
+          <td>${esc(l.labTac) || '—'}</td>
+          <td>${esc(l.labGfr) || '—'}</td>
+          <td>${esc(l.labPhos) || '—'}</td>
+          <td>${esc(l.labK) || '—'}</td>
+          <td>${esc(l.labGlu) || '—'}</td>
         </tr>`;
     }).join('');
   return rows || '<tr><td colspan="7" style="text-align:center;color:#888;">No lab data recorded</td></tr>';
@@ -107,7 +107,7 @@ function wellbeingRows(logs: { date: Date; log: DailyLog | null }[]): string {
         <td>${l.mood > 0 ? moodLabels[l.mood] : '—'}</td>
         <td>${l.sleepQuality > 0 ? `${l.sleepQuality}/5` : '—'}</td>
         <td>${l.stressLevel > 0 ? stressLabels[l.stressLevel] : '—'}</td>
-        <td>${l.wellbeingNotes || '—'}</td>
+        <td>${esc(l.wellbeingNotes) || '—'}</td>
       </tr>`;
     }).join('');
   return rows || '<tr><td colspan="5" style="text-align:center;color:#888;">No wellbeing data recorded</td></tr>';

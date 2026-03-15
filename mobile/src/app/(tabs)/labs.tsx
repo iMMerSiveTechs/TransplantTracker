@@ -74,12 +74,11 @@ export default function LabsScreen() {
       Burnt.toast({ title: 'File too large (max 20 MB)', preset: 'error' });
       return;
     }
-    // Sanitize filename: strip unsafe characters, cap length, ensure non-empty result.
-    const sanitized = asset.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60) || 'attachment';
-    // Copy from ephemeral cache to durable document directory so the file
-    // survives app restarts and OS cache eviction.
+    // Use a generated filename — never trust user-supplied names for filesystem writes.
+    // The original display name is stored in the LabImport record for UI purposes only.
+    const ext = (asset.name.split('.').pop() ?? 'bin').replace(/[^a-zA-Z0-9]/g, '').slice(0, 10);
     await FileSystem.makeDirectoryAsync(LAB_DIR, { intermediates: true });
-    const destUri = `${LAB_DIR}lab_${Date.now()}_${sanitized}`;
+    const destUri = `${LAB_DIR}${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
     await FileSystem.copyAsync({ from: asset.uri, to: destUri });
     const newImport: LabImport = {
       id: `lab_${Date.now()}`,
@@ -111,10 +110,27 @@ export default function LabsScreen() {
     if (loadedDateKey && loadedDateKey !== currentId) return;
     const isEmpty = JSON.stringify(log) === JSON.stringify(EMPTY_LOG);
     if (!logFromStorage && isEmpty) return;
-    S.set(`log_${currentId}`, log);
+    S.set(`log_${currentId}`, log).then(saved => {
+      if (!saved) Burnt.toast({ title: 'Could not save lab values', preset: 'error' });
+    });
   }, [log, loaded]);
 
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });
+
+  // Physiologically sane upper bounds for each lab field.
+  // Values above these are almost certainly data-entry errors.
+  const LAB_MAX: Partial<Record<keyof DailyLog, number>> = {
+    labCr: 30, labTac: 100, labGfr: 250, labPhos: 20, labK: 15, labGlu: 2000,
+  };
+  const updLab = (k: keyof DailyLog, v: string) => {
+    const n = parseFloat(v);
+    const max = LAB_MAX[k];
+    if (v !== '' && !isNaN(n) && max !== undefined && n > max) {
+      Burnt.toast({ title: `Value too high — check entry`, preset: 'error' });
+      return;
+    }
+    upd(k, v);
+  };
 
   const getVariant = (color: string) => {
     if (color === 'success') return 'success';
@@ -172,7 +188,7 @@ export default function LabsScreen() {
           <NumberField
             label={LAB_R.cr.label}
             value={log.labCr}
-            onChange={(v) => upd('labCr', v)}
+            onChange={(v) => updLab('labCr', v)}
             unit={LAB_R.cr.unit}
             error={labClr('cr', log.labCr) === 'danger'}
           />
@@ -194,7 +210,7 @@ export default function LabsScreen() {
           <NumberField
             label={LAB_R.gfr.label}
             value={log.labGfr}
-            onChange={(v) => upd('labGfr', v)}
+            onChange={(v) => updLab('labGfr', v)}
             unit={LAB_R.gfr.unit}
             error={labClr('gfr', log.labGfr) === 'danger'}
           />
@@ -218,7 +234,7 @@ export default function LabsScreen() {
           <NumberField
             label={LAB_R.tac.label}
             value={log.labTac}
-            onChange={(v) => upd('labTac', v)}
+            onChange={(v) => updLab('labTac', v)}
             unit={LAB_R.tac.unit}
             error={labClr('tac', log.labTac) === 'danger'}
           />
@@ -245,7 +261,7 @@ export default function LabsScreen() {
           <NumberField
             label={LAB_R.k.label}
             value={log.labK}
-            onChange={(v) => upd('labK', v)}
+            onChange={(v) => updLab('labK', v)}
             unit={LAB_R.k.unit}
             error={labClr('k', log.labK) === 'danger'}
           />
@@ -267,7 +283,7 @@ export default function LabsScreen() {
           <NumberField
             label={LAB_R.phos.label}
             value={log.labPhos}
-            onChange={(v) => upd('labPhos', v)}
+            onChange={(v) => updLab('labPhos', v)}
             unit={LAB_R.phos.unit}
             error={labClr('phos', log.labPhos) === 'danger'}
           />
@@ -291,7 +307,7 @@ export default function LabsScreen() {
           <NumberField
             label={LAB_R.glu.label}
             value={log.labGlu}
-            onChange={(v) => upd('labGlu', v)}
+            onChange={(v) => updLab('labGlu', v)}
             unit={LAB_R.glu.unit}
             error={labClr('glu', log.labGlu) === 'danger'}
           />

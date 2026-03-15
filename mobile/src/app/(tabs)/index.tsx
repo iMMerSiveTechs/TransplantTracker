@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { EMPTY_LOG, type DailyLog, type MedDose, type Medication } from '@/data/types';
 import { CL_LIMITS } from '@/data/clinicalLimits';
@@ -89,10 +90,28 @@ export default function TodayScreen() {
     if (loadedDateKey && loadedDateKey !== currentId) return;
     const isEmpty = JSON.stringify(log) === JSON.stringify(EMPTY_LOG);
     if (!logFromStorage && isEmpty) return;
-    S.set(`log_${currentId}`, log);
+    S.set(`log_${currentId}`, log).then(saved => {
+      if (!saved) Burnt.toast({ title: 'Could not save vitals', preset: 'error' });
+    });
   }, [log, loaded]);
 
   const upd = (k: keyof DailyLog, v: any) => setLog({ ...log, [k]: v });
+
+  // Physiologically impossible upper bounds — reject values above these to prevent
+  // absurd entries (e.g. weight 99999) from polluting charts and shared reports.
+  const VITAL_MAX: Partial<Record<keyof DailyLog, number>> = {
+    weight: 999, amTemp: 115, pmTemp: 115,
+    amSys: 300, pmSys: 300, amDia: 200, pmDia: 200, amHr: 300, pmHr: 300,
+  };
+  const updVital = (k: keyof DailyLog, v: string) => {
+    const n = parseFloat(v);
+    const max = VITAL_MAX[k];
+    if (v !== '' && !isNaN(n) && max !== undefined && n > max) {
+      Burnt.toast({ title: `Value too high — check entry`, preset: 'error' });
+      return;
+    }
+    upd(k, v);
+  };
 
   // Validation helpers
   const amTempNum = parseFloat(log.amTemp);
@@ -104,8 +123,9 @@ export default function TodayScreen() {
 
   // Guard isNaN: parseFloat("") or parseFloat(undefined) returns NaN.
   // NaN comparisons always return false, so the alert would silently never fire.
-  const hasFever = (!isNaN(amTempNum) && amTempNum >= CL_LIMITS.feverWarning) ||
-                   (!isNaN(pmTempNum) && pmTempNum >= CL_LIMITS.feverWarning);
+  const validTemps = [amTempNum, pmTempNum].filter(n => !isNaN(n));
+  const maxTemp = validTemps.length > 0 ? Math.max(...validTemps) : 0;
+  const hasFever = validTemps.some(t => t >= CL_LIMITS.feverWarning);
   const hasBpIssue = (!isNaN(amSysNum) && (amSysNum > CL_LIMITS.bpSysHigh || amSysNum < CL_LIMITS.bpSysLow)) ||
                      (!isNaN(pmSysNum) && (pmSysNum > CL_LIMITS.bpSysHigh || pmSysNum < CL_LIMITS.bpSysLow));
 
@@ -132,7 +152,7 @@ export default function TodayScreen() {
         <Alrt
           icon="🌡️"
           title="Temperature Warning"
-          msg={`Fever detected (${[amTempNum, pmTempNum].filter(n => !isNaN(n)).reduce((a, b) => Math.max(a, b), 0).toFixed(1)}°F). Contact your team if above 101.5°F.`}
+          msg={`Fever detected (${maxTemp.toFixed(1)}°F). Contact your team if above 101.5°F.`}
           variant="danger"
         />
       ) : null}
@@ -179,7 +199,7 @@ export default function TodayScreen() {
           <NumberField
             label="Weight"
             value={log.weight}
-            onChange={(v) => upd('weight', v)}
+            onChange={(v) => updVital('weight', v)}
             unit="lbs"
           />
         </View>
@@ -192,7 +212,7 @@ export default function TodayScreen() {
           <NumberField
             label="Temp"
             value={log.amTemp}
-            onChange={(v) => upd('amTemp', v)}
+            onChange={(v) => updVital('amTemp', v)}
             unit="°F"
             error={amTempNum >= CL_LIMITS.feverWarning}
           />
@@ -200,7 +220,7 @@ export default function TodayScreen() {
           <NumberField
             label="BP Systolic"
             value={log.amSys}
-            onChange={(v) => upd('amSys', v)}
+            onChange={(v) => updVital('amSys', v)}
             unit="mmHg"
             error={(amSysNum > CL_LIMITS.bpSysHigh) || (amSysNum < CL_LIMITS.bpSysLow)}
           />
@@ -210,14 +230,14 @@ export default function TodayScreen() {
           <NumberField
             label="BP Diastolic"
             value={log.amDia}
-            onChange={(v) => upd('amDia', v)}
+            onChange={(v) => updVital('amDia', v)}
             unit="mmHg"
           />
           <View style={{ width: 12 }} />
           <NumberField
             label="Heart Rate"
             value={log.amHr}
-            onChange={(v) => upd('amHr', v)}
+            onChange={(v) => updVital('amHr', v)}
             unit="bpm"
             error={(amHrNum > CL_LIMITS.hrHigh) || (amHrNum < CL_LIMITS.hrLow)}
           />
@@ -231,7 +251,7 @@ export default function TodayScreen() {
           <NumberField
             label="Temp"
             value={log.pmTemp}
-            onChange={(v) => upd('pmTemp', v)}
+            onChange={(v) => updVital('pmTemp', v)}
             unit="°F"
             error={pmTempNum >= CL_LIMITS.feverWarning}
           />
@@ -239,7 +259,7 @@ export default function TodayScreen() {
           <NumberField
             label="BP Systolic"
             value={log.pmSys}
-            onChange={(v) => upd('pmSys', v)}
+            onChange={(v) => updVital('pmSys', v)}
             unit="mmHg"
             error={(pmSysNum > CL_LIMITS.bpSysHigh) || (pmSysNum < CL_LIMITS.bpSysLow)}
           />
@@ -249,14 +269,14 @@ export default function TodayScreen() {
           <NumberField
             label="BP Diastolic"
             value={log.pmDia}
-            onChange={(v) => upd('pmDia', v)}
+            onChange={(v) => updVital('pmDia', v)}
             unit="mmHg"
           />
           <View style={{ width: 12 }} />
           <NumberField
             label="Heart Rate"
             value={log.pmHr}
-            onChange={(v) => upd('pmHr', v)}
+            onChange={(v) => updVital('pmHr', v)}
             unit="bpm"
             error={(pmHrNum > CL_LIMITS.hrHigh) || (pmHrNum < CL_LIMITS.hrLow)}
           />
@@ -300,17 +320,21 @@ export default function TodayScreen() {
         <View style={{ height: 12 }} />
         <Text style={styles.painLabel}>Pain Level (0 = none): {log.pain}/10</Text>
         <View style={styles.painScale}>
-          {[...Array(11)].map((_, i) => (
-            <Pressable
-              key={i}
-              style={[styles.painBtn, log.pain === i && styles.painBtnActive]}
-              accessibilityLabel={`Pain level ${i}`}
-              accessibilityRole="button"
-              onPress={() => upd('pain', i)}
-            >
-              <Text style={[styles.painBtnText, log.pain === i && styles.painBtnTextActive]}>{i}</Text>
-            </Pressable>
-          ))}
+          {[...Array(11)].map((_, i) => {
+            const painColor = i === 0 ? '#10B981' : i <= 3 ? '#F59E0B' : i <= 6 ? '#F97316' : '#E11D48';
+            const isActive = log.pain === i;
+            return (
+              <Pressable
+                key={i}
+                style={[styles.painBtn, isActive ? { backgroundColor: painColor, borderColor: painColor } : null]}
+                accessibilityLabel={`Pain level ${i}`}
+                accessibilityRole="button"
+                onPress={() => upd('pain', i)}
+              >
+                <Text style={[styles.painBtnText, isActive && styles.painBtnTextActive]}>{i}</Text>
+              </Pressable>
+            );
+          })}
         </View>
       </Card>
 
@@ -338,6 +362,7 @@ export default function TodayScreen() {
               onPress={() => upd('mood', log.mood === i + 1 ? 0 : i + 1)}
             >
               <Text style={styles.wbEmoji}>{emoji}</Text>
+              <Text style={styles.wbScale}>{['Bad', 'Low', 'OK', 'Good', 'Great'][i]}</Text>
             </Pressable>
           ))}
         </View>
@@ -351,6 +376,7 @@ export default function TodayScreen() {
               onPress={() => upd('sleepQuality', log.sleepQuality === i + 1 ? 0 : i + 1)}
             >
               <Text style={styles.wbEmoji}>{emoji}</Text>
+              <Text style={styles.wbScale}>{['Poor', 'Fair', 'OK', 'Good', 'Great'][i]}</Text>
             </Pressable>
           ))}
         </View>
@@ -364,6 +390,7 @@ export default function TodayScreen() {
               onPress={() => upd('stressLevel', log.stressLevel === i + 1 ? 0 : i + 1)}
             >
               <Text style={styles.wbEmoji}>{emoji}</Text>
+              <Text style={styles.wbScale}>{['None', 'Low', 'Mid', 'High', 'Max'][i]}</Text>
             </Pressable>
           ))}
         </View>
@@ -414,8 +441,9 @@ const styles = StyleSheet.create({
   complianceCta: { fontSize: 10, fontWeight: '600', color: colors.indigo500, textAlign: 'right', lineHeight: 15 },
   wbLabel: { fontSize: 12, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1, color: colors.slate600, marginBottom: 8, marginTop: 12 },
   wbRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
-  wbBtn: { flex: 1, aspectRatio: 1, backgroundColor: colors.slate100, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.slate200 },
+  wbBtn: { flex: 1, paddingVertical: 8, backgroundColor: colors.slate100, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.slate200, minHeight: 52 },
   wbBtnActive: { backgroundColor: colors.indigo50, borderColor: colors.indigo400 },
-  wbEmoji: { fontSize: 22 },
+  wbEmoji: { fontSize: 20 },
+  wbScale: { fontSize: 8, fontWeight: '600', color: colors.slate400, marginTop: 2 },
   wbNotes: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: colors.slate50, borderWidth: 1, borderColor: colors.slate200, fontSize: 14, color: colors.slate700, minHeight: 60, textAlignVertical: 'top' },
 });

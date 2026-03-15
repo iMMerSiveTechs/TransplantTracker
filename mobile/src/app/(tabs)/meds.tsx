@@ -65,7 +65,9 @@ export default function MedsScreen() {
 
   useEffect(() => {
     if (loaded) {
-      S.set('medications', meds);
+      S.set('medications', meds).then(saved => {
+        if (!saved) Burnt.toast({ title: 'Could not save medications', preset: 'error' });
+      });
     }
   }, [meds, loaded]);
 
@@ -179,6 +181,11 @@ export default function MedsScreen() {
 
   const saveMed = async () => {
     if (!formName.trim()) return;
+    const parsedPpd = parseInt(formPpd);
+    if (isNaN(parsedPpd) || parsedPpd < 1) {
+      Burnt.toast({ title: 'Pills per day must be at least 1', preset: 'error' });
+      return;
+    }
     if (editingMed) {
       const updatedMed: Medication = {
         ...editingMed,
@@ -210,6 +217,7 @@ export default function MedsScreen() {
   };
 
   const getLowStockWarning = (med: Medication) => {
+    if (med.ppd < 1) return { show: false, daysLeft: 0 };
     const daysLeft = Math.floor(med.inv / med.ppd);
     return { show: daysLeft <= CL_LIMITS.lowMedDays, daysLeft };
   };
@@ -219,7 +227,7 @@ export default function MedsScreen() {
 
   const renderMedCard = (med: Medication) => {
     const warning = getLowStockWarning(med);
-    const daysLeft = Math.floor(med.inv / med.ppd);
+    const daysLeft = med.ppd > 0 ? Math.floor(med.inv / med.ppd) : 0;
     const progressPct = (daysLeft / 30) * 100;
     const doseCount = dosesTodayForMed(med.id);
     const lastDose = todayDoses.filter(d => d.medId === med.id).slice(-1)[0];

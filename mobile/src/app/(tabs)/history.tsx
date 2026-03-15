@@ -37,7 +37,7 @@ export default function HistoryScreen() {
 
   // Reload whenever the tab comes into focus so changes made on other tabs
   // (vitals on Today, labs on Labs) are always reflected immediately.
-  useFocusEffect(load);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

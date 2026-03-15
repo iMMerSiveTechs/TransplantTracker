@@ -196,7 +196,7 @@ export default function MeScreen() {
       Burnt.toast({ title: 'Profile not loaded yet. Please try again.', preset: 'error' });
       return;
     }
-    await saveProfile({ ...profile, type: editType, surgDate: editSurgDate });
+    await saveProfile({ ...profile, type: editType, surgDate: editSurgDate.toISOString().split('T')[0] });
     setShowProfileEdit(false);
     Burnt.toast({ title: 'Profile updated', preset: 'done' });
   };
@@ -221,6 +221,10 @@ export default function MeScreen() {
 
   const saveAppt = async () => {
     if (!aDate.trim() || !aTime.trim()) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(aDate.trim())) {
+      Burnt.toast({ title: 'Date must be YYYY-MM-DD (e.g. 2026-04-15)', preset: 'error' });
+      return;
+    }
     if (editingApptId) {
       await saveAppts(appts.map(a => a.id === editingApptId ? { ...a, date: aDate.trim(), time: aTime.trim(), doc: aDoc.trim(), desc: aDesc.trim() } : a));
     } else {
@@ -299,7 +303,18 @@ export default function MeScreen() {
             <Text style={styles.calBtnText}>→</Text>
           </Pressable>
         </View>
-        <MiniCal year={calYear} month={calMonth} appts={appts} />
+        <MiniCal
+          year={calYear}
+          month={calMonth}
+          appts={appts}
+          onDay={(_, info) => {
+            if (info.ap) openEditAppt(info.ap);
+            else if (info.lt) {
+              const label = info.lt === 'yellow' ? 'Yellow Lab (Mon/Thu)' : info.lt === 'pink' ? 'Pink Lab (Monthly)' : 'Green Lab (Special)';
+              Burnt.toast({ title: label, preset: 'none' });
+            }
+          }}
+        />
         <View style={styles.calLegend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: colors.yellow400 }]} />
