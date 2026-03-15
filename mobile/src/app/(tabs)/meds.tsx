@@ -44,10 +44,9 @@ export default function MedsScreen() {
       const savedMeds = await S.get('medications');
       // Use saved meds if available; fall back to INIT_MEDS only for fresh installs
       // (when onboarding hasn't run yet and storage has never been written).
-      setMeds(savedMeds ?? INIT_MEDS);
+      setMeds(Array.isArray(savedMeds) ? savedMeds : INIT_MEDS);
       const doses = await S.get(getTodayKey());
-      if (doses) setTodayDoses(doses);
-      else setTodayDoses([]);
+      setTodayDoses(Array.isArray(doses) ? doses : []);
       setLoaded(true);
     }
     load();
@@ -416,23 +415,23 @@ export default function MedsScreen() {
           </View>
 
           <Text style={styles.modalLabel}>Medication Name *</Text>
-          <TextInput value={formName} onChangeText={setFormName} placeholder="e.g. Tacrolimus (Prograf)" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={formName} onChangeText={setFormName} placeholder="e.g. Tacrolimus (Prograf)" placeholderTextColor={colors.slate300} maxLength={60} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Dosage</Text>
-          <TextInput value={formDosage} onChangeText={setFormDosage} placeholder="e.g. 2mg twice daily" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={formDosage} onChangeText={setFormDosage} placeholder="e.g. 2mg twice daily" placeholderTextColor={colors.slate300} maxLength={80} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Instructions</Text>
-          <TextInput value={formInstr} onChangeText={setFormInstr} placeholder="e.g. Take with food" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={formInstr} onChangeText={setFormInstr} placeholder="e.g. Take with food" placeholderTextColor={colors.slate300} maxLength={200} style={styles.modalInput} />
 
           <View style={styles.modalRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.modalLabel}>Pills on Hand</Text>
-              <TextInput value={formInv} onChangeText={setFormInv} keyboardType="number-pad" placeholder="30" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+              <TextInput value={formInv} onChangeText={setFormInv} keyboardType="number-pad" placeholder="30" placeholderTextColor={colors.slate300} maxLength={5} style={styles.modalInput} />
             </View>
             <View style={{ width: 12 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.modalLabel}>Pills per Day</Text>
-              <TextInput value={formPpd} onChangeText={setFormPpd} keyboardType="number-pad" placeholder="1" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+              <TextInput value={formPpd} onChangeText={setFormPpd} keyboardType="number-pad" placeholder="1" placeholderTextColor={colors.slate300} maxLength={3} style={styles.modalInput} />
             </View>
           </View>
 

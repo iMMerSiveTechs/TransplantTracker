@@ -118,6 +118,11 @@ export default function MeScreen() {
   const liftedRestrictions = RESTS.filter(r => weeksSince >= r.w);
 
   const handleCall = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 7) {
+      Burnt.toast({ title: 'Invalid phone number', preset: 'error' });
+      return;
+    }
     Linking.openURL(`tel:${phone}`);
   };
 
@@ -468,13 +473,13 @@ export default function MeScreen() {
           </View>
 
           <Text style={styles.modalLabel}>Name / Label *</Text>
-          <TextInput value={cLabel} onChangeText={setCLabel} placeholder="e.g. Transplant Coordinator" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={cLabel} onChangeText={setCLabel} placeholder="e.g. Transplant Coordinator" placeholderTextColor={colors.slate300} maxLength={50} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Description</Text>
-          <TextInput value={cSub} onChangeText={setCSubText} placeholder="e.g. Business Hours" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={cSub} onChangeText={setCSubText} placeholder="e.g. Business Hours" placeholderTextColor={colors.slate300} maxLength={100} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Phone Number *</Text>
-          <TextInput value={cPhone} onChangeText={setCPhone} placeholder="e.g. (650) 723-6661" placeholderTextColor={colors.slate300} keyboardType="phone-pad" style={styles.modalInput} />
+          <TextInput value={cPhone} onChangeText={setCPhone} placeholder="e.g. (650) 723-6661" placeholderTextColor={colors.slate300} keyboardType="phone-pad" maxLength={20} style={styles.modalInput} />
 
           <Pressable style={[styles.urgentToggle, cUrgent ? styles.urgentToggleActive : null]} onPress={() => setCUrgent(!cUrgent)}>
             <Text style={styles.urgentToggleText}>{cUrgent ? '🔴 24/7 Urgent Line' : '⚪ Mark as 24/7 Urgent'}</Text>
@@ -571,16 +576,16 @@ export default function MeScreen() {
           </View>
 
           <Text style={styles.modalLabel}>Date (YYYY-MM-DD) *</Text>
-          <TextInput value={aDate} onChangeText={setADate} placeholder="e.g. 2026-04-15" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={aDate} onChangeText={setADate} placeholder="e.g. 2026-04-15" placeholderTextColor={colors.slate300} maxLength={10} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Time *</Text>
-          <TextInput value={aTime} onChangeText={setATime} placeholder="e.g. 9:30 AM" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={aTime} onChangeText={setATime} placeholder="e.g. 9:30 AM" placeholderTextColor={colors.slate300} maxLength={10} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Doctor / Provider</Text>
-          <TextInput value={aDoc} onChangeText={setADoc} placeholder="e.g. Dr. Smith" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={aDoc} onChangeText={setADoc} placeholder="e.g. Dr. Smith" placeholderTextColor={colors.slate300} maxLength={60} style={styles.modalInput} />
 
           <Text style={styles.modalLabel}>Description</Text>
-          <TextInput value={aDesc} onChangeText={setADesc} placeholder="e.g. 4-week follow-up" placeholderTextColor={colors.slate300} style={styles.modalInput} />
+          <TextInput value={aDesc} onChangeText={setADesc} placeholder="e.g. 4-week follow-up" placeholderTextColor={colors.slate300} maxLength={200} style={styles.modalInput} />
 
           <Pressable
             style={[styles.saveBtn, (!aDate.trim() || !aTime.trim()) ? styles.btnDisabled : null]}

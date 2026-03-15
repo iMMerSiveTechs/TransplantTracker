@@ -22,6 +22,7 @@ export default function NumberField({ label, value, onChange, unit, error, place
           placeholder={placeholder || "\u2014"}
           placeholderTextColor={colors.slate300}
           keyboardType="decimal-pad"
+          maxLength={10}
           style={styles.input}
           accessibilityLabel={label}
         />

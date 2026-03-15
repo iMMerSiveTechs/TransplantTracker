@@ -8,8 +8,6 @@ export interface DailyLog {
   pmSys: string;
   pmDia: string;
   pmHr: string;
-  amMeds: boolean;
-  pmMeds: boolean;
   fluidMl: number;
   incision: boolean;
   nausea: boolean;
@@ -42,7 +40,7 @@ export interface DailyLog {
 export const EMPTY_LOG: DailyLog = {
   weight: "", amTemp: "", amSys: "", amDia: "", amHr: "",
   pmTemp: "", pmSys: "", pmDia: "", pmHr: "",
-  amMeds: false, pmMeds: false, fluidMl: 0,
+  fluidMl: 0,
   incision: false, nausea: false, urineDown: false, burning: false, pain: 0,
   acidReflux: false, gas: false, bloating: false, diarrhea: false, constipation: false, appetite: "normal",
   tenderness: false, swelling: false,

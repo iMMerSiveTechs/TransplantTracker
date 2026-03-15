@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { colors } from '@/data/colors';
 import { CL_LIMITS } from '@/data/clinicalLimits';
 import { addD, toId } from '@/utils/dates';
@@ -18,24 +19,25 @@ export default function HistoryScreen() {
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
 
-  useEffect(() => {
-    async function load() {
-      const today = new Date();
-      const points: DataPoint[] = [];
+  const load = useCallback(async () => {
+    const today = new Date();
+    const points: DataPoint[] = [];
 
-      // Load last 30 days of data
-      for (let i = 29; i >= 0; i--) {
-        const date = addD(today, -i);
-        const dateId = toId(date);
-        const log = await S.get(`log_${dateId}`);
-        points.push({ date, log });
-      }
-
-      setDataPoints(points);
-      setLoaded(true);
+    // Load last 30 days of data
+    for (let i = 29; i >= 0; i--) {
+      const date = addD(today, -i);
+      const dateId = toId(date);
+      const log = await S.get(`log_${dateId}`);
+      points.push({ date, log });
     }
-    load();
+
+    setDataPoints(points);
+    setLoaded(true);
   }, []);
+
+  // Reload whenever the tab comes into focus so changes made on other tabs
+  // (vitals on Today, labs on Labs) are always reflected immediately.
+  useFocusEffect(load);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>

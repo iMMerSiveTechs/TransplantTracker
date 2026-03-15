@@ -8,6 +8,15 @@ function fmtDate(d: Date): string {
   return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
+// Escape user-supplied strings before embedding in HTML to prevent markup injection.
+function esc(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function vitalsRows(logs: { date: Date; log: DailyLog | null }[]): string {
   const rows = logs
     .filter(p => p.log)
@@ -51,9 +60,9 @@ function medRows(meds: Medication[]): string {
     const supplyStr = daysLeft !== null ? `${daysLeft} days` : '—';
     return `
     <tr>
-      <td>${m.name}</td>
-      <td>${m.dosage || '—'}</td>
-      <td>${m.instr || '—'}</td>
+      <td>${esc(m.name)}</td>
+      <td>${esc(m.dosage || '—')}</td>
+      <td>${esc(m.instr || '—')}</td>
       <td>${m.critical ? 'Critical' : 'Standard'}</td>
       <td>${supplyStr}</td>
     </tr>
@@ -81,7 +90,7 @@ async function adherenceRows(meds: Medication[], days: Date[]): Promise<string> 
       total += med.ppd;
     }
     const pct = total > 0 ? Math.round((taken / total) * 100) : 0;
-    rows.push(`<tr><td>${med.name}</td><td>${taken}/${total} doses</td><td>${pct}%</td></tr>`);
+    rows.push(`<tr><td>${esc(med.name)}</td><td>${taken}/${total} doses</td><td>${pct}%</td></tr>`);
   }
   return rows.join('');
 }
@@ -118,9 +127,9 @@ export async function generateAndShareReport(): Promise<void> {
 
   const recentPoints = points.slice(-7);
   const allDates = points.map(p => p.date);
-  const name = profile?.name || 'Patient';
-  const transplantType = profile?.type || 'Transplant';
-  const surgDate = profile?.surgDate ? fmtDate(new Date(profile.surgDate)) : 'Unknown';
+  const name = esc(profile?.name || 'Patient');
+  const transplantType = esc(profile?.type || 'Transplant');
+  const surgDate = esc(profile?.surgDate ? fmtDate(new Date(profile.surgDate)) : 'Unknown');
   const adherenceHtml = await adherenceRows(meds, allDates);
   const wellbeingHtml = wellbeingRows(recentPoints);
 

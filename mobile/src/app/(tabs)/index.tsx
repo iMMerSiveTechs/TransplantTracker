@@ -102,9 +102,12 @@ export default function TodayScreen() {
   const amHrNum = parseFloat(log.amHr);
   const pmHrNum = parseFloat(log.pmHr);
 
-  const hasFever = (amTempNum >= CL_LIMITS.feverWarning) || (pmTempNum >= CL_LIMITS.feverWarning);
-  const hasBpIssue = (amSysNum > CL_LIMITS.bpSysHigh) || (pmSysNum > CL_LIMITS.bpSysHigh) ||
-                      (amSysNum < CL_LIMITS.bpSysLow) || (pmSysNum < CL_LIMITS.bpSysLow);
+  // Guard isNaN: parseFloat("") or parseFloat(undefined) returns NaN.
+  // NaN comparisons always return false, so the alert would silently never fire.
+  const hasFever = (!isNaN(amTempNum) && amTempNum >= CL_LIMITS.feverWarning) ||
+                   (!isNaN(pmTempNum) && pmTempNum >= CL_LIMITS.feverWarning);
+  const hasBpIssue = (!isNaN(amSysNum) && (amSysNum > CL_LIMITS.bpSysHigh || amSysNum < CL_LIMITS.bpSysLow)) ||
+                     (!isNaN(pmSysNum) && (pmSysNum > CL_LIMITS.bpSysHigh || pmSysNum < CL_LIMITS.bpSysLow));
 
   const fluidPct = (log.fluidMl / CL_LIMITS.fluidGoal) * 100;
   const hasSymptoms = log.incision || log.nausea || log.urineDown || log.burning || log.pain > 0;
@@ -129,7 +132,7 @@ export default function TodayScreen() {
         <Alrt
           icon="🌡️"
           title="Temperature Warning"
-          msg={`Fever detected (${Math.max(amTempNum, pmTempNum).toFixed(1)}°F). Contact your team if above 101.5°F.`}
+          msg={`Fever detected (${[amTempNum, pmTempNum].filter(n => !isNaN(n)).reduce((a, b) => Math.max(a, b), 0).toFixed(1)}°F). Contact your team if above 101.5°F.`}
           variant="danger"
         />
       ) : null}
@@ -372,6 +375,7 @@ export default function TodayScreen() {
           value={log.wellbeingNotes}
           onChangeText={(v) => upd('wellbeingNotes', v)}
           multiline
+          maxLength={500}
         />
       </Card>
 

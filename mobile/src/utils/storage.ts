@@ -9,11 +9,16 @@ const S = {
       return null;
     }
   },
-  async set(k: string, v: any): Promise<void> {
+  // Returns true on success, false on failure.
+  // Callers performing critical writes (dose tracking, med saves, profile saves)
+  // should check the return value and show a toast on false.
+  async set(k: string, v: any): Promise<boolean> {
     try {
       await AsyncStorage.setItem(k, JSON.stringify(v));
+      return true;
     } catch (e) {
-      console.error(e);
+      console.error('[Storage] Failed to write key:', k, e);
+      return false;
     }
   },
   async del(k: string): Promise<void> {

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { LAB_R, labClr } from '@/data/labTests';
 import { toId } from '@/utils/dates';
@@ -41,7 +42,7 @@ export default function LabsScreen() {
   useEffect(() => {
     async function load() {
       const savedImports = await S.get('lab_imports');
-      if (savedImports) setImports(savedImports);
+      if (Array.isArray(savedImports)) setImports(savedImports);
       await loadDayLog();
     }
     load();
@@ -53,8 +54,14 @@ export default function LabsScreen() {
   }, [loadDayLog]));
 
   const LAB_DIR = `${FileSystem.documentDirectory}lab_attachments/`;
+  const MAX_SINGLE_FILE_BYTES = 20 * 1024 * 1024; // 20 MB per file
+  const MAX_ATTACHMENTS = 100; // total count limit
 
   const pickLabFile = async () => {
+    if (imports.length >= MAX_ATTACHMENTS) {
+      Burnt.toast({ title: 'Too many attachments (max 100). Remove old files first.', preset: 'error' });
+      return;
+    }
     const currentId = toId(new Date());
     const result = await DocumentPicker.getDocumentAsync({
       type: ['application/pdf', 'image/*'],
@@ -62,10 +69,17 @@ export default function LabsScreen() {
     });
     if (result.canceled || !result.assets?.length) return;
     const asset = result.assets[0];
+    // File size guard: reject anything over 20 MB to prevent storage bloat.
+    if (asset.size !== undefined && asset.size !== null && asset.size > MAX_SINGLE_FILE_BYTES) {
+      Burnt.toast({ title: 'File too large (max 20 MB)', preset: 'error' });
+      return;
+    }
+    // Sanitize filename: strip unsafe characters, cap length, ensure non-empty result.
+    const sanitized = asset.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 60) || 'attachment';
     // Copy from ephemeral cache to durable document directory so the file
     // survives app restarts and OS cache eviction.
     await FileSystem.makeDirectoryAsync(LAB_DIR, { intermediates: true });
-    const destUri = `${LAB_DIR}lab_${Date.now()}_${asset.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const destUri = `${LAB_DIR}lab_${Date.now()}_${sanitized}`;
     await FileSystem.copyAsync({ from: asset.uri, to: destUri });
     const newImport: LabImport = {
       id: `lab_${Date.now()}`,

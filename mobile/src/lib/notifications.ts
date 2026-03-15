@@ -37,8 +37,10 @@ export async function scheduleMedReminder(med: Medication): Promise<void> {
   await Notifications.scheduleNotificationAsync({
     identifier: `med_${med.id}`,
     content: {
-      title: `💊 Time for ${med.name}`,
-      body: med.instr || `Take your ${med.dosage} dose`,
+      // Generic text only — med name and dosage are PHI and must not appear
+      // on the lock screen where they're visible to anyone who picks up the phone.
+      title: '💊 Time for your medication',
+      body: 'Tap to log your dose',
       sound: true,
     },
     trigger: {

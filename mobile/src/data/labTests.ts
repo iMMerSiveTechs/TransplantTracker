@@ -1,3 +1,6 @@
+// ⚠️ YEAR-SPECIFIC: Update PINK_DATES and GREEN_DATES each January with the
+// new year's lab schedule from the transplant center. LAST UPDATED: 2026.
+// Yellow labs (Mon + Thu) are weekday-based and require no update.
 export const PINK_DATES = new Set([
   "2026-02-16","2026-03-16","2026-04-13","2026-05-11","2026-06-15",
   "2026-07-13","2026-08-10","2026-09-14","2026-10-12","2026-11-16","2026-12-14"

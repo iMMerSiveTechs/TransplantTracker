@@ -144,6 +144,7 @@ export default function SetupScreen() {
               onChangeText={setName}
               placeholder="Enter your full name"
               placeholderTextColor={colors.slate300}
+              maxLength={50}
               style={styles.input}
             />
 
@@ -237,6 +238,7 @@ export default function SetupScreen() {
               placeholder="e.g. (650) 498-6000"
               placeholderTextColor={colors.slate300}
               keyboardType="phone-pad"
+              maxLength={20}
               style={styles.input}
             />
 
@@ -248,6 +250,7 @@ export default function SetupScreen() {
               placeholder="e.g. (650) 723-6661"
               placeholderTextColor={colors.slate300}
               keyboardType="phone-pad"
+              maxLength={20}
               style={styles.input}
             />
 
@@ -259,6 +262,7 @@ export default function SetupScreen() {
               placeholder="e.g. (650) 723-5000"
               placeholderTextColor={colors.slate300}
               keyboardType="phone-pad"
+              maxLength={20}
               style={styles.input}
             />
           </Card>
