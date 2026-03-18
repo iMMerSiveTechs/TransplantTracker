@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
-  Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -15,63 +15,73 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
+import S from '@/utils/storage';
+import { toId, addD } from '@/utils/dates';
 
-// All storage keys used by the app
-const ALL_KEYS = [
-  'profile',
+// Fixed storage keys to include in export
+const EXPORT_KEYS = [
   'medications',
-  'onboarding_complete',
+  'profile',
+  'appointments',
   'pharmacies',
   'insurance_plans',
-  'rejection_episodes',
-  'complication_events',
-  'vaccination_records',
   'clinical_notes',
+  'rejection_episodes',
+  'vaccination_records',
+  'complication_events',
   'lab_imports',
-  'appointments',
-  'contacts',
+  'onboarding_complete',
 ];
 
-// Plus dynamic keys: log_YYYY-MM-DD, doses_YYYY-MM-DD
-async function getAllStorageKeys(): Promise<string[]> {
-  try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    return allKeys as string[];
-  } catch {
-    return [];
-  }
+interface DataSummary {
+  medications: number;
+  appointments: number;
+  daysLogged: number;
+  labImports: number;
 }
 
 async function exportBackup(): Promise<string> {
-  const allKeys = await getAllStorageKeys();
-  const pairs = await AsyncStorage.multiGet(allKeys);
-  const data: Record<string, any> = {};
-  for (const [key, value] of pairs) {
+  const exportData: Record<string, unknown> = {
+    _schema_version: 1,
+    _exported_at: new Date().toISOString(),
+  };
+
+  // Export fixed keys
+  for (const key of EXPORT_KEYS) {
+    const value = await S.get(key);
     if (value !== null) {
-      try {
-        data[key] = JSON.parse(value);
-      } catch {
-        data[key] = value;
-      }
+      exportData[key] = value;
     }
   }
-  return JSON.stringify({
-    version: 1,
-    exportDate: new Date().toISOString(),
-    data,
-  }, null, 2);
+
+  // Export last 30 days of logs + dose logs
+  const today = new Date();
+  for (let i = 0; i < 30; i++) {
+    const d = addD(today, -i);
+    const logKey = `log_${toId(d)}`;
+    const dosesKey = `doses_${toId(d)}`;
+    const log = await S.get(logKey);
+    const doses = await S.get(dosesKey);
+    if (log !== null) exportData[logKey] = log;
+    if (doses !== null) exportData[dosesKey] = doses;
+  }
+
+  return JSON.stringify(exportData, null, 2);
 }
 
 async function importBackup(jsonString: string): Promise<{ keysRestored: number }> {
-  const parsed = JSON.parse(jsonString);
-  if (!parsed.data || typeof parsed.data !== 'object') {
-    throw new Error('Invalid backup file format.');
+  const parsed = JSON.parse(jsonString) as Record<string, unknown>;
+  if (!parsed._schema_version) {
+    throw new Error('Invalid backup file — missing _schema_version. This file may not be a valid TransplantTracker backup.');
   }
-  const entries = Object.entries(parsed.data) as [string, any][];
-  const pairs: [string, string][] = entries.map(([k, v]) => [k, JSON.stringify(v)]);
-  await AsyncStorage.multiSet(pairs);
-  return { keysRestored: pairs.length };
+  const metaKeys = new Set(['_schema_version', '_exported_at']);
+  const entries = Object.entries(parsed).filter(([k]) => !metaKeys.has(k));
+  for (const [key, value] of entries) {
+    await S.set(key, value);
+  }
+  return { keysRestored: entries.length };
 }
 
 export default function BackupRestoreScreen() {
@@ -79,14 +89,45 @@ export default function BackupRestoreScreen() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [summary, setSummary] = useState<DataSummary>({ medications: 0, appointments: 0, daysLogged: 0, labImports: 0 });
+  const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
+  const [pendingJson, setPendingJson] = useState<string | null>(null);
+  const [pendingExportedAt, setPendingExportedAt] = useState<string>('Unknown');
+  const [lastExportTime, setLastExportTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadSummary();
+  }, []);
+
+  async function loadSummary() {
+    const meds: unknown[] = (await S.get('medications')) ?? [];
+    const appts: unknown[] = (await S.get('appointments')) ?? [];
+    const labImports: unknown[] = (await S.get('lab_imports')) ?? [];
+
+    let daysLogged = 0;
+    const today = new Date();
+    for (let i = 0; i < 90; i++) {
+      const d = addD(today, -i);
+      const log = await S.get(`log_${toId(d)}`);
+      if (log) daysLogged++;
+    }
+
+    setSummary({
+      medications: Array.isArray(meds) ? meds.length : 0,
+      appointments: Array.isArray(appts) ? appts.length : 0,
+      daysLogged,
+      labImports: Array.isArray(labImports) ? labImports.length : 0,
+    });
+  }
 
   async function handleExport() {
     try {
       setExporting(true);
       setStatusMsg(null);
       const json = await exportBackup();
-      const filename = `transplanttracker_backup_${new Date().toISOString().slice(0, 10)}.json`;
-      const fileUri = FileSystem.cacheDirectory + filename;
+      const today = new Date();
+      const filename = `transplant-backup-${toId(today)}.json`;
+      const fileUri = `${FileSystem.documentDirectory}${filename}`;
       await FileSystem.writeAsStringAsync(fileUri, json, { encoding: FileSystem.EncodingType.UTF8 });
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
@@ -95,12 +136,15 @@ export default function BackupRestoreScreen() {
           dialogTitle: 'Save TransplantTracker Backup',
           UTI: 'public.json',
         });
-        setStatusMsg('Backup exported successfully.');
+        const timeStr = today.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        setLastExportTime(timeStr);
+        Burnt.toast({ title: 'Backup exported successfully', preset: 'done' });
       } else {
-        setStatusMsg('Sharing is not available on this device.');
+        Burnt.toast({ title: 'Sharing is not available on this device', preset: 'error' });
       }
-    } catch (e: any) {
-      Alert.alert('Export Failed', e?.message ?? 'An error occurred during export.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'An error occurred during export.';
+      Burnt.toast({ title: msg, preset: 'error' });
     } finally {
       setExporting(false);
     }
@@ -114,7 +158,7 @@ export default function BackupRestoreScreen() {
         type: 'application/json',
         copyToCacheDirectory: true,
       });
-      if (result.canceled) {
+      if (result.canceled || !result.assets?.length) {
         setImporting(false);
         return;
       }
@@ -123,32 +167,55 @@ export default function BackupRestoreScreen() {
         encoding: FileSystem.EncodingType.UTF8,
       });
 
-      // Confirm before overwriting
-      Alert.alert(
-        'Restore Backup?',
-        'This will replace ALL current app data with the backup. This cannot be undone.',
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => setImporting(false) },
-          {
-            text: 'Restore',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                const { keysRestored } = await importBackup(jsonString);
-                setStatusMsg(`Restored ${keysRestored} data entries. Please restart the app.`);
-              } catch (e: any) {
-                Alert.alert('Restore Failed', e?.message ?? 'Could not parse backup file.');
-              } finally {
-                setImporting(false);
-              }
-            },
-          },
-        ]
-      );
-    } catch (e: any) {
-      Alert.alert('Import Failed', e?.message ?? 'An error occurred.');
+      // Validate before showing confirm
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(jsonString) as Record<string, unknown>;
+      } catch {
+        Burnt.toast({ title: 'Could not read backup file — invalid JSON', preset: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      if (!parsed._schema_version) {
+        Burnt.toast({ title: 'Invalid backup file — missing schema version', preset: 'error' });
+        setImporting(false);
+        return;
+      }
+
+      const exportedAt = parsed._exported_at as string | undefined;
+      const displayDate = exportedAt
+        ? new Date(exportedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : 'Unknown date';
+      setPendingJson(jsonString);
+      setPendingExportedAt(displayDate);
+      setShowConfirmModal(true);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'An error occurred.';
+      Burnt.toast({ title: msg, preset: 'error' });
+    } finally {
       setImporting(false);
     }
+  }
+
+  async function confirmRestore() {
+    if (!pendingJson) return;
+    setShowConfirmModal(false);
+    try {
+      const { keysRestored } = await importBackup(pendingJson);
+      setPendingJson(null);
+      await loadSummary();
+      setStatusMsg(`Restored ${keysRestored} data entries successfully.`);
+      Burnt.toast({ title: 'Data restored successfully', preset: 'done' });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Could not parse backup file.';
+      Burnt.toast({ title: msg, preset: 'error' });
+    }
+  }
+
+  function cancelRestore() {
+    setPendingJson(null);
+    setShowConfirmModal(false);
   }
 
   async function handleClearData() {
@@ -164,8 +231,10 @@ export default function BackupRestoreScreen() {
             try {
               await AsyncStorage.clear();
               setStatusMsg('All data cleared. The app will restart from setup.');
-            } catch (e: any) {
-              Alert.alert('Error', 'Failed to clear data: ' + (e?.message ?? ''));
+              Burnt.toast({ title: 'All data cleared', preset: 'done' });
+            } catch (e: unknown) {
+              const msg = e instanceof Error ? e.message : '';
+              Burnt.toast({ title: 'Failed to clear data: ' + msg, preset: 'error' });
             }
           },
         },
@@ -185,22 +254,47 @@ export default function BackupRestoreScreen() {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
-        {/* Info card */}
-        <View style={styles.infoCard}>
-          <Text style={styles.infoIcon}>🔒</Text>
-          <Text style={styles.infoText}>
-            Your data is stored <Text style={{ fontWeight: '700' }}>only on this device</Text>.
-            Export a backup before switching phones or reinstalling the app.
-            Backups are saved as a JSON file you can store anywhere.
+        {/* Warning card */}
+        <View style={styles.warningCard}>
+          <Text style={styles.warningTitle}>⚠️ Important</Text>
+          <Text style={styles.warningBodyText}>
+            Backup often. This app stores data <Text style={{ fontWeight: '700' }}>only on this device</Text>. If you lose your phone without a backup, your data cannot be recovered.
           </Text>
         </View>
 
-        {/* Export */}
+        {/* Data Summary */}
+        <Text style={styles.sectionLabel}>Your Data</Text>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Export Backup</Text>
+          <View style={styles.summaryGrid}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>{summary.medications}</Text>
+              <Text style={styles.summaryLabel}>Medications</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>{summary.appointments}</Text>
+              <Text style={styles.summaryLabel}>Appointments</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>{summary.daysLogged}</Text>
+              <Text style={styles.summaryLabel}>Days Logged</Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryValue}>{summary.labImports}</Text>
+              <Text style={styles.summaryLabel}>Lab Imports</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Export */}
+        <Text style={styles.sectionLabel}>Export</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>💾 Export All Data</Text>
           <Text style={styles.sectionDesc}>
-            Creates a complete backup of all your health data — vitals, medications, labs, appointments, and settings — as a single file.
+            Creates a complete backup of all your health data — vitals, medications, labs, appointments, and settings — as a single JSON file.
           </Text>
+          {lastExportTime ? (
+            <Text style={styles.lastExportText}>Last exported this session: {lastExportTime}</Text>
+          ) : null}
           <Pressable
             style={[styles.primaryBtn, exporting && styles.btnDisabled]}
             onPress={handleExport}
@@ -208,19 +302,21 @@ export default function BackupRestoreScreen() {
           >
             {exporting
               ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryBtnText}>📤 Export Backup</Text>
+              : <Text style={styles.primaryBtnText}>📦 Export All Data</Text>
             }
           </Pressable>
         </View>
 
         {/* Import */}
+        <Text style={styles.sectionLabel}>Restore</Text>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Restore from Backup</Text>
+          <Text style={styles.sectionTitle}>📂 Import from File</Text>
           <Text style={styles.sectionDesc}>
             Select a previously exported backup file to restore your data.
-            {'\n'}
-            <Text style={styles.warningText}>⚠️ This replaces all current data.</Text>
           </Text>
+          <View style={styles.importWarningBox}>
+            <Text style={styles.warningText}>⚠️ This will overwrite your current data. Continue?</Text>
+          </View>
           <Pressable
             style={[styles.secondaryBtn, importing && styles.btnDisabled]}
             onPress={handleImport}
@@ -228,17 +324,17 @@ export default function BackupRestoreScreen() {
           >
             {importing
               ? <ActivityIndicator color={colors.indigo600} />
-              : <Text style={styles.secondaryBtnText}>📥 Restore from File</Text>
+              : <Text style={styles.secondaryBtnText}>📥 Import from File</Text>
             }
           </Pressable>
         </View>
 
         {/* Status message */}
-        {statusMsg !== null && (
+        {statusMsg !== null ? (
           <View style={styles.statusCard}>
             <Text style={styles.statusText}>✅ {statusMsg}</Text>
           </View>
-        )}
+        ) : null}
 
         {/* Danger zone */}
         <View style={[styles.section, styles.dangerSection]}>
@@ -257,8 +353,8 @@ export default function BackupRestoreScreen() {
           {[
             '• Profile & personal targets',
             '• Medication list & settings',
-            '• Daily logs (vitals, labs, symptoms)',
-            '• Dose history',
+            '• Daily logs (vitals, labs, symptoms) — last 30 days',
+            '• Dose history — last 30 days',
             '• Appointments',
             '• Rejection & complication events',
             '• Clinical notes',
@@ -270,6 +366,34 @@ export default function BackupRestoreScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Confirm Restore Modal */}
+      <Modal
+        visible={showConfirmModal}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={cancelRestore}
+        accessibilityViewIsModal
+      >
+        <View style={styles.confirmModal}>
+          <Text style={styles.confirmTitle}>Restore from Backup?</Text>
+          <Text style={styles.confirmDesc}>
+            This backup was created on{'\n'}
+            <Text style={{ fontWeight: '700', color: colors.slate800 }}>{pendingExportedAt}</Text>
+          </Text>
+          <View style={styles.confirmWarningBox}>
+            <Text style={styles.confirmWarningText}>
+              ⚠️ This will overwrite all your current data with the contents of this backup. This cannot be undone.
+            </Text>
+          </View>
+          <Pressable style={styles.confirmRestoreBtn} onPress={confirmRestore}>
+            <Text style={styles.confirmRestoreBtnText}>Yes, Restore Data</Text>
+          </Pressable>
+          <Pressable style={styles.confirmCancelBtn} onPress={cancelRestore}>
+            <Text style={styles.confirmCancelBtnText}>Cancel</Text>
+          </Pressable>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -291,16 +415,42 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.slate800 },
   scroll: { flex: 1 },
   content: { padding: 16, gap: 16, paddingBottom: 48 },
-  infoCard: {
-    backgroundColor: colors.indigo50,
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    color: colors.slate500,
+    marginBottom: 4,
+    marginTop: 4,
+  },
+  warningCard: {
+    backgroundColor: colors.amber50,
     borderRadius: 12,
     padding: 16,
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
+    borderWidth: 1.5,
+    borderColor: colors.amber200,
   },
-  infoIcon: { fontSize: 22 },
-  infoText: { flex: 1, fontSize: 14, color: colors.indigo600, lineHeight: 21 },
+  warningTitle: { fontSize: 14, fontWeight: '700', color: colors.amber700, marginBottom: 6 },
+  warningBodyText: { fontSize: 13, color: colors.amber700, lineHeight: 20 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  summaryItem: {
+    width: '45%',
+    backgroundColor: colors.slate50,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: 'center',
+  },
+  summaryValue: { fontSize: 28, fontWeight: '800', color: colors.indigo600 },
+  summaryLabel: { fontSize: 11, color: colors.slate500, marginTop: 2, fontWeight: '600' },
+  lastExportText: { fontSize: 11, color: colors.emerald700, fontWeight: '500' },
+  importWarningBox: {
+    backgroundColor: colors.rose50,
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: colors.rose200,
+  },
   section: {
     backgroundColor: colors.white,
     borderRadius: 14,
@@ -314,7 +464,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.slate800 },
   sectionDesc: { fontSize: 13, color: colors.slate500, lineHeight: 20 },
-  warningText: { color: colors.amber700, fontWeight: '600' },
+  warningText: { color: colors.rose700, fontWeight: '600', fontSize: 12 },
   primaryBtn: {
     backgroundColor: colors.indigo600,
     paddingVertical: 14,
@@ -364,4 +514,38 @@ const styles = StyleSheet.create({
   },
   detailTitle: { fontSize: 14, fontWeight: '700', color: colors.slate700, marginBottom: 4 },
   detailItem: { fontSize: 13, color: colors.slate500, lineHeight: 20 },
+  // Confirm modal
+  confirmModal: {
+    flex: 1,
+    backgroundColor: colors.white,
+    padding: 28,
+    justifyContent: 'center',
+  },
+  confirmTitle: { fontSize: 22, fontWeight: '800', color: colors.slate800, marginBottom: 10 },
+  confirmDesc: { fontSize: 14, color: colors.slate600, lineHeight: 22, marginBottom: 16 },
+  confirmWarningBox: {
+    backgroundColor: colors.rose50,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 24,
+    borderWidth: 1.5,
+    borderColor: colors.rose200,
+  },
+  confirmWarningText: { fontSize: 13, color: colors.rose700, lineHeight: 20, fontWeight: '500' },
+  confirmRestoreBtn: {
+    backgroundColor: colors.rose500,
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  confirmRestoreBtnText: { fontSize: 16, fontWeight: '700', color: colors.white },
+  confirmCancelBtn: {
+    paddingVertical: 14,
+    borderRadius: 14,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.slate200,
+  },
+  confirmCancelBtnText: { fontSize: 15, fontWeight: '600', color: colors.slate600 },
 });
