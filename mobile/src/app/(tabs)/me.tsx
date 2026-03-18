@@ -12,7 +12,7 @@ import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
 import MiniCal from '@/components/MiniCal';
 import { generateAndShareReport } from '@/lib/sharing';
-import type { Profile, Appointment, Contact } from '@/data/types';
+import type { Profile, Appointment, Contact, PersonalTargets } from '@/data/types';
 
 const TRANSPLANT_TIPS: Record<string, string[]> = {
   Kidney: [
@@ -89,6 +89,16 @@ export default function MeScreen() {
   const [aTime, setATime] = useState<string>('');
   const [aDoc, setADoc] = useState<string>('');
   const [aDesc, setADesc] = useState<string>('');
+
+  // Targets modal state
+  const [showTargetsModal, setShowTargetsModal] = useState<boolean>(false);
+  const [tCrTarget, setTCrTarget] = useState<string>('');
+  const [tTacMin, setTTacMin] = useState<string>('');
+  const [tTacMax, setTTacMax] = useState<string>('');
+  const [tBpSys, setTBpSys] = useState<string>('');
+  const [tBpDia, setTBpDia] = useState<string>('');
+  const [tWeightBaseline, setTWeightBaseline] = useState<string>('');
+  const [tFluidGoal, setTFluidGoal] = useState<string>('');
 
   const today = new Date();
   const surgDate = profile?.surgDate ? new Date(profile.surgDate) : getSurgDefault();
@@ -238,6 +248,44 @@ export default function MeScreen() {
     await saveAppts(appts.filter(a => a.id !== id));
   };
 
+  // Targets modal
+  const openTargetsModal = () => {
+    const pt = profile?.personalTargets;
+    setTCrTarget(pt?.crTarget ?? '');
+    setTTacMin(pt?.tacMin != null ? String(pt.tacMin) : '');
+    setTTacMax(pt?.tacMax != null ? String(pt.tacMax) : '');
+    setTBpSys(pt?.bpSysTarget != null ? String(pt.bpSysTarget) : '');
+    setTBpDia(pt?.bpDiaTarget != null ? String(pt.bpDiaTarget) : '');
+    setTWeightBaseline(pt?.weightBaseline != null ? String(pt.weightBaseline) : '');
+    setTFluidGoal(pt?.fluidGoalMl != null ? String(pt.fluidGoalMl) : '');
+    setShowTargetsModal(true);
+  };
+
+  const saveTargets = async () => {
+    if (!profile) return;
+    const personalTargets: PersonalTargets = {
+      ...(profile.personalTargets ?? {}),
+      crTarget: tCrTarget.trim() || undefined,
+      tacMin: tTacMin ? parseFloat(tTacMin) : undefined,
+      tacMax: tTacMax ? parseFloat(tTacMax) : undefined,
+      bpSysTarget: tBpSys ? parseInt(tBpSys, 10) : undefined,
+      bpDiaTarget: tBpDia ? parseInt(tBpDia, 10) : undefined,
+      weightBaseline: tWeightBaseline ? parseFloat(tWeightBaseline) : undefined,
+      fluidGoalMl: tFluidGoal ? parseInt(tFluidGoal, 10) : undefined,
+    };
+    await saveProfile({ ...profile, personalTargets });
+    setShowTargetsModal(false);
+    Burnt.toast({ title: 'Targets saved', preset: 'done' });
+  };
+
+  const phaseColor = daysSince < 90 ? colors.rose600 : daysSince < 365 ? colors.amber700 : colors.emerald700;
+  const phaseLabel = daysSince < 90 ? '🔴 Early (< 3mo)' : daysSince < 365 ? '🟡 Intermediate' : '🟢 Stable (1yr+)';
+  const phaseBlurb = daysSince < 90
+    ? 'Early phase: highest rejection risk. Lab checks frequent. Report any fever, swelling, or decreased urine immediately.'
+    : daysSince < 365
+    ? 'Intermediate phase: immune system stabilizing. Immunosuppression often being tapered. Stay consistent with medications.'
+    : 'Stable phase: long-term graft protection is the goal. Blood pressure and lifestyle are now primary concerns.';
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -362,6 +410,144 @@ export default function MeScreen() {
         </Card>
       ))}
 
+      {/* Emergency Contacts */}
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeaderText}>Emergency Contacts</Text>
+        <Pressable style={styles.addContactBtn} onPress={openAddContact}>
+          <Text style={styles.addContactBtnText}>+ Add</Text>
+        </Pressable>
+      </View>
+
+      <Card accent={colors.rose500}>
+        <Pressable onPress={() => handleCall('911')} style={styles.emergBtn}>
+          <Text style={styles.emergIcon}>🚨</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.emergTitle}>Emergency: Call 911</Text>
+            <Text style={styles.emergSub}>Severe symptoms, chest pain, difficulty breathing</Text>
+          </View>
+        </Pressable>
+      </Card>
+
+      {profile?.contacts?.map((contact, idx) => (
+        <Card key={`${contact.phone}_${idx}`}>
+          <View style={styles.contactRow}>
+            <Pressable onPress={() => handleCall(contact.phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={styles.contactIcon}>{contact.icon}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactLabel}>{contact.label}</Text>
+                <Text style={styles.contactSub}>{contact.sub}</Text>
+                <Text style={styles.contactPhone}>{contact.phone}</Text>
+              </View>
+              {contact.urgent ? <Badge label="24/7" variant="danger" /> : null}
+            </Pressable>
+            <Pressable onPress={() => openEditContact(idx)} style={styles.editContactBtn}>
+              <Text style={styles.editContactBtnText}>Edit</Text>
+            </Pressable>
+          </View>
+        </Card>
+      ))}
+
+      {(!profile?.contacts || profile.contacts.length === 0) ? (
+        <Card flat style={{ backgroundColor: colors.slate100 }}>
+          <Text style={styles.noContactText}>No contacts added yet. Tap "+ Add" to add your transplant team.</Text>
+        </Card>
+      ) : null}
+
+      {/* Quick Access Hub — Row 1 */}
+      <SectionLabel title="Quick Access" sub="Tools & Resources" />
+      <View style={styles.hubRow}>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/food-guide')} accessibilityRole="button" accessibilityLabel="Food Safety Guide">
+          <Text style={styles.hubIcon}>🥗</Text>
+          <Text style={styles.hubTitle}>Food Safety Guide</Text>
+          <Text style={styles.hubSub}>92 foods checked</Text>
+        </Pressable>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/pharmacy-hub')} accessibilityRole="button" accessibilityLabel="Pharmacy Hub">
+          <Text style={styles.hubIcon}>🏥</Text>
+          <Text style={styles.hubTitle}>Pharmacy Hub</Text>
+          <Text style={styles.hubSub}>Your pharmacies</Text>
+        </Pressable>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/insurance-hub')} accessibilityRole="button" accessibilityLabel="Insurance Hub">
+          <Text style={styles.hubIcon}>🏦</Text>
+          <Text style={styles.hubTitle}>Insurance Hub</Text>
+          <Text style={styles.hubSub}>Plans & prior auth</Text>
+        </Pressable>
+      </View>
+
+      {/* Quick Access Hub — Row 2 */}
+      <View style={styles.hubRow}>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/rejection-log')} accessibilityRole="button" accessibilityLabel="Rejection Log">
+          <Text style={styles.hubIcon}>🩺</Text>
+          <Text style={styles.hubTitle}>Rejection Log</Text>
+          <Text style={styles.hubSub}>Episodes & events</Text>
+        </Pressable>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/vaccination-record')} accessibilityRole="button" accessibilityLabel="Vaccinations">
+          <Text style={styles.hubIcon}>💉</Text>
+          <Text style={styles.hubTitle}>Vaccinations</Text>
+          <Text style={styles.hubSub}>Immunization record</Text>
+        </Pressable>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/clinical-notes')} accessibilityRole="button" accessibilityLabel="Clinical Notes">
+          <Text style={styles.hubIcon}>📋</Text>
+          <Text style={styles.hubTitle}>Clinical Notes</Text>
+          <Text style={styles.hubSub}>Appointments & calls</Text>
+        </Pressable>
+      </View>
+
+      {/* Personalized Targets Card */}
+      <SectionLabel title="My Clinical Targets" sub="Set from your physician's guidance" />
+      <Card>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+          {[
+            { label: 'Creatinine', value: profile?.personalTargets?.crTarget, unit: 'mg/dL', default: '<1.5' },
+            { label: 'TAC Level', value: profile?.personalTargets?.tacMin && profile?.personalTargets?.tacMax ? `${profile.personalTargets.tacMin}–${profile.personalTargets.tacMax}` : null, unit: 'ng/mL', default: '5–15' },
+            { label: 'BP Target', value: profile?.personalTargets?.bpSysTarget ? `${profile.personalTargets.bpSysTarget}/${profile.personalTargets.bpDiaTarget ?? 80}` : null, unit: 'mmHg', default: '<130/80' },
+            { label: 'Fluid Goal', value: profile?.personalTargets?.fluidGoalMl ? String(profile.personalTargets.fluidGoalMl) : null, unit: 'mL/day', default: '2500' },
+          ].map(t => (
+            <View key={t.label} style={{ width: '47%', backgroundColor: colors.slate50, borderRadius: 10, padding: 10 }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5 }}>{t.label}</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: t.value ? colors.indigo600 : colors.slate400, marginTop: 2 }}>
+                {t.value ?? t.default}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.slate400 }}>{t.unit}{t.value ? '' : ' (default)'}</Text>
+            </View>
+          ))}
+        </View>
+        <Pressable style={{ marginTop: 12, paddingVertical: 8, alignItems: 'center', backgroundColor: colors.slate100, borderRadius: 10 }} onPress={openTargetsModal}>
+          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.slate700 }}>✏️ Edit Targets</Text>
+        </Pressable>
+      </Card>
+
+      {/* Share Info */}
+      <Card flat style={{ backgroundColor: colors.emerald50 }}>
+        <Text style={styles.shareInfoTitle}>📤 Share with Your Care Team</Text>
+        <Text style={styles.shareInfoText}>
+          Tap "Share" above to generate a PDF with your vitals, lab values, and medications. Share via email, messages, or print for your next appointment.
+        </Text>
+      </Card>
+
+      {/* Transplant Journey Timeline */}
+      <SectionLabel title="Your Journey" />
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 22, fontWeight: '800', color: colors.indigo600 }}>
+              {daysSince} days
+            </Text>
+            <Text style={{ fontSize: 12, color: colors.slate500, marginTop: 2 }}>
+              {Math.floor(daysSince / 30)} months · {Math.floor(daysSince / 7)} weeks post-transplant
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 11, color: colors.slate400 }}>Transplant Phase</Text>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: phaseColor, marginTop: 2 }}>
+              {phaseLabel}
+            </Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: 12, color: colors.slate500, lineHeight: 18, marginTop: 10, padding: 10, backgroundColor: colors.slate50, borderRadius: 8 }}>
+          {phaseBlurb}
+        </Text>
+      </Card>
+
       {/* Active Restrictions */}
       <SectionLabel title="Active Restrictions" sub={`${activeRestrictions.length} active`} />
       {activeRestrictions.length > 0 ? (
@@ -409,76 +595,10 @@ export default function MeScreen() {
         </>
       ) : null}
 
-      {/* Emergency Contacts */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionHeaderText}>Emergency Contacts</Text>
-        <Pressable style={styles.addContactBtn} onPress={openAddContact}>
-          <Text style={styles.addContactBtnText}>+ Add</Text>
-        </Pressable>
-      </View>
-
-      <Card accent={colors.rose500}>
-        <Pressable onPress={() => handleCall('911')} style={styles.emergBtn}>
-          <Text style={styles.emergIcon}>🚨</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.emergTitle}>Emergency: Call 911</Text>
-            <Text style={styles.emergSub}>Severe symptoms, chest pain, difficulty breathing</Text>
-          </View>
-        </Pressable>
-      </Card>
-
-      {profile?.contacts?.map((contact, idx) => (
-        <Card key={`${contact.phone}_${idx}`}>
-          <View style={styles.contactRow}>
-            <Pressable onPress={() => handleCall(contact.phone)} style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={styles.contactIcon}>{contact.icon}</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.contactLabel}>{contact.label}</Text>
-                <Text style={styles.contactSub}>{contact.sub}</Text>
-                <Text style={styles.contactPhone}>{contact.phone}</Text>
-              </View>
-              {contact.urgent ? <Badge label="24/7" variant="danger" /> : null}
-            </Pressable>
-            <Pressable onPress={() => openEditContact(idx)} style={styles.editContactBtn}>
-              <Text style={styles.editContactBtnText}>Edit</Text>
-            </Pressable>
-          </View>
-        </Card>
-      ))}
-
-      {(!profile?.contacts || profile.contacts.length === 0) ? (
-        <Card flat style={{ backgroundColor: colors.slate100 }}>
-          <Text style={styles.noContactText}>No contacts added yet. Tap "+ Add" to add your transplant team.</Text>
-        </Card>
-      ) : null}
-
-      {/* Quick Access Hub */}
-      <SectionLabel title="Quick Access" sub="Tools & Resources" />
-      <View style={styles.hubRow}>
-        <Pressable style={styles.hubCard} onPress={() => router.push('/food-guide')} accessibilityRole="button" accessibilityLabel="Food Safety Guide">
-          <Text style={styles.hubIcon}>🥗</Text>
-          <Text style={styles.hubTitle}>Food Safety Guide</Text>
-          <Text style={styles.hubSub}>92 foods checked</Text>
-        </Pressable>
-        <Pressable style={styles.hubCard} onPress={() => router.push('/pharmacy-hub')} accessibilityRole="button" accessibilityLabel="Pharmacy Hub">
-          <Text style={styles.hubIcon}>🏥</Text>
-          <Text style={styles.hubTitle}>Pharmacy Hub</Text>
-          <Text style={styles.hubSub}>Your pharmacies</Text>
-        </Pressable>
-        <Pressable style={styles.hubCard} onPress={() => router.push('/insurance-hub')} accessibilityRole="button" accessibilityLabel="Insurance Hub">
-          <Text style={styles.hubIcon}>🏦</Text>
-          <Text style={styles.hubTitle}>Insurance Hub</Text>
-          <Text style={styles.hubSub}>Plans & prior auth</Text>
-        </Pressable>
-      </View>
-
-      {/* Share Info */}
-      <Card flat style={{ backgroundColor: colors.emerald50 }}>
-        <Text style={styles.shareInfoTitle}>📤 Share with Your Care Team</Text>
-        <Text style={styles.shareInfoText}>
-          Tap "Share" above to generate a PDF with your vitals, lab values, and medications. Share via email, messages, or print for your next appointment.
-        </Text>
-      </Card>
+      {/* Backup & Restore */}
+      <Pressable style={styles.backupBtn} onPress={() => router.push('/backup-restore')}>
+        <Text style={styles.backupBtnText}>📦 Backup & Restore Data</Text>
+      </Pressable>
 
       {__DEV__ ? (
         <Pressable style={styles.devBtn} onPress={() => router.push('/dev')}>
@@ -639,6 +759,49 @@ export default function MeScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </Modal>
+
+      {/* Targets Modal */}
+      <Modal visible={showTargetsModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowTargetsModal(false)} accessibilityViewIsModal>
+        <ScrollView style={styles.modal} contentContainerStyle={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Clinical Targets</Text>
+            <Pressable onPress={() => setShowTargetsModal(false)} accessibilityLabel="Close targets editor">
+              <Text style={styles.modalClose}>✕</Text>
+            </Pressable>
+          </View>
+
+          <Text style={{ fontSize: 13, color: colors.slate500, marginBottom: 16, lineHeight: 20 }}>
+            Enter the personalized targets your physician has set for you. Leave blank to use defaults.
+          </Text>
+
+          <Text style={styles.modalLabel}>Creatinine Target (e.g. &lt;1.5)</Text>
+          <TextInput value={tCrTarget} onChangeText={setTCrTarget} placeholder="e.g. <1.5" placeholderTextColor={colors.slate300} maxLength={10} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Tacrolimus Min (ng/mL)</Text>
+          <TextInput value={tTacMin} onChangeText={setTTacMin} placeholder="e.g. 5" placeholderTextColor={colors.slate300} keyboardType="decimal-pad" maxLength={6} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Tacrolimus Max (ng/mL)</Text>
+          <TextInput value={tTacMax} onChangeText={setTTacMax} placeholder="e.g. 15" placeholderTextColor={colors.slate300} keyboardType="decimal-pad" maxLength={6} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>BP Systolic Target (mmHg)</Text>
+          <TextInput value={tBpSys} onChangeText={setTBpSys} placeholder="e.g. 130" placeholderTextColor={colors.slate300} keyboardType="number-pad" maxLength={5} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>BP Diastolic Target (mmHg)</Text>
+          <TextInput value={tBpDia} onChangeText={setTBpDia} placeholder="e.g. 80" placeholderTextColor={colors.slate300} keyboardType="number-pad" maxLength={5} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Weight Baseline / Dry Weight (lbs)</Text>
+          <TextInput value={tWeightBaseline} onChangeText={setTWeightBaseline} placeholder="e.g. 165" placeholderTextColor={colors.slate300} keyboardType="decimal-pad" maxLength={6} style={styles.modalInput} />
+
+          <Text style={styles.modalLabel}>Fluid Goal (mL/day)</Text>
+          <TextInput value={tFluidGoal} onChangeText={setTFluidGoal} placeholder="e.g. 2500" placeholderTextColor={colors.slate300} keyboardType="number-pad" maxLength={6} style={styles.modalInput} />
+
+          <Pressable style={[styles.saveBtn, { marginTop: 24 }]} onPress={saveTargets}>
+            <Text style={styles.saveBtnText}>Save Targets</Text>
+          </Pressable>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </Modal>
     </ScrollView>
   );
 }
@@ -701,6 +864,8 @@ const styles = StyleSheet.create({
   hubIcon: { fontSize: 26, marginBottom: 6 },
   hubTitle: { fontSize: 12, fontWeight: '700', color: colors.slate800, textAlign: 'center', marginBottom: 2 },
   hubSub: { fontSize: 10, color: colors.slate500, textAlign: 'center' },
+  backupBtn: { marginTop: 12, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1.5, borderColor: colors.indigo400, alignSelf: 'center' },
+  backupBtnText: { fontSize: 13, fontWeight: '600', color: colors.indigo600 },
   devBtn: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: colors.slate300, alignSelf: 'center' },
   devBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate400 },
   shareInfoTitle: { fontSize: 14, fontWeight: '700', color: colors.emerald700, marginBottom: 6 },

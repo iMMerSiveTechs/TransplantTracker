@@ -8,22 +8,41 @@ interface CardProps {
   accent?: string;
   onPress?: () => void;
   style?: ViewStyle;
+  disabled?: boolean;
 }
 
-export default function Card({ children, flat, accent, onPress, style }: CardProps) {
-  const Wrapper = onPress ? Pressable : View;
+export default function Card({ children, flat, accent, onPress, style, disabled }: CardProps) {
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={disabled ? undefined : onPress}
+        style={({ pressed }) => [
+          styles.card,
+          flat ? styles.flat : styles.shadow,
+          accent ? { borderLeftWidth: 4, borderLeftColor: accent } : undefined,
+          style,
+          disabled && { opacity: 0.5 },
+          pressed && !disabled && { opacity: 0.92 },
+        ]}
+        android_ripple={!disabled ? { color: 'rgba(0,0,0,0.06)' } : undefined}
+      >
+        {children}
+      </Pressable>
+    );
+  }
+
   return (
-    <Wrapper
-      onPress={onPress}
+    <View
       style={[
         styles.card,
         flat ? styles.flat : styles.shadow,
         accent ? { borderLeftWidth: 4, borderLeftColor: accent } : undefined,
         style,
+        disabled && { opacity: 0.5 },
       ]}
     >
       {children}
-    </Wrapper>
+    </View>
   );
 }
 

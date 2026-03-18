@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Pressable, TextInput, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { LAB_R, labClr } from '@/data/labTests';
+import { LAB_R as LAB_R_LIMITS } from '@/data/clinicalLimits';
+import type { LabKey } from '@/data/clinicalLimits';
 import { toId } from '@/utils/dates';
 import S from '@/utils/storage';
 import Card from '@/components/Card';
@@ -22,6 +24,8 @@ export default function LabsScreen() {
   // Track which date key was loaded to detect midnight rollovers
   const [loadedDateKey, setLoadedDateKey] = useState<string>('');
   const [imports, setImports] = useState<LabImport[]>([]);
+  const [showMoreLabs, setShowMoreLabs] = useState<boolean>(false);
+  const [labDate, setLabDate] = useState<string>('');
 
   const loadDayLog = useCallback(async () => {
     const currentId = toId(new Date());
@@ -121,6 +125,7 @@ export default function LabsScreen() {
   // Values above these are almost certainly data-entry errors.
   const LAB_MAX: Partial<Record<keyof DailyLog, number>> = {
     labCr: 30, labTac: 100, labGfr: 250, labPhos: 20, labK: 15, labGlu: 2000,
+    labAlt: 2000, labAst: 2000, labMg: 10, labHgb: 25, labWbc: 100, labBun: 200,
   };
   const updLab = (k: keyof DailyLog, v: string) => {
     const n = parseFloat(v);
@@ -139,6 +144,13 @@ export default function LabsScreen() {
     return 'muted';
   };
 
+  // Helper: get reference range text for a lab key from clinicalLimits
+  const getRangeText = (labKey: LabKey): string => {
+    const range = LAB_R_LIMITS[labKey];
+    if (!range) return '';
+    return `Normal: ${range.green[0]}–${range.green[1]} ${range.unit}`;
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Header */}
@@ -151,6 +163,25 @@ export default function LabsScreen() {
           <Text style={styles.importBtnText}>📎 Attach</Text>
         </Pressable>
       </View>
+
+      {/* Lab Date Entry */}
+      <SectionLabel title="Lab Date" sub="Optional — track when these labs were drawn" />
+      <Card>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TextInput
+            value={labDate}
+            onChangeText={setLabDate}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.slate400}
+            style={[styles.dateInput, { flex: 1 }]}
+            keyboardType="numbers-and-punctuation"
+            maxLength={10}
+          />
+          <Pressable style={styles.todayBtn} onPress={() => setLabDate(toId(new Date()))}>
+            <Text style={styles.todayBtnText}>Today</Text>
+          </Pressable>
+        </View>
+      </Card>
 
       {/* Imported Files */}
       {imports.length > 0 ? (
@@ -202,6 +233,9 @@ export default function LabsScreen() {
             ) : null}
           </View>
         </View>
+        {log.labCr ? (
+          <Text style={styles.rangeText}>{getRangeText('labCr')}</Text>
+        ) : null}
         <Text style={styles.note}>{LAB_R.cr.note}</Text>
 
         <View style={{ height: 16 }} />
@@ -224,6 +258,9 @@ export default function LabsScreen() {
             ) : null}
           </View>
         </View>
+        {log.labGfr ? (
+          <Text style={styles.rangeText}>{getRangeText('labGfr')}</Text>
+        ) : null}
         <Text style={styles.note}>{LAB_R.gfr.note}</Text>
       </Card>
 
@@ -248,6 +285,9 @@ export default function LabsScreen() {
             ) : null}
           </View>
         </View>
+        {log.labTac ? (
+          <Text style={styles.rangeText}>{getRangeText('labTac')}</Text>
+        ) : null}
         <Text style={styles.note}>{LAB_R.tac.note}</Text>
         <Text style={styles.importantNote}>
           Critical: Take Tacrolimus exactly 12 hours apart. Do not take dose on lab morning until after blood draw.
@@ -275,6 +315,9 @@ export default function LabsScreen() {
             ) : null}
           </View>
         </View>
+        {log.labK ? (
+          <Text style={styles.rangeText}>{getRangeText('labK')}</Text>
+        ) : null}
         <Text style={styles.note}>{LAB_R.k.note}</Text>
 
         <View style={{ height: 16 }} />
@@ -297,6 +340,9 @@ export default function LabsScreen() {
             ) : null}
           </View>
         </View>
+        {log.labPhos ? (
+          <Text style={styles.rangeText}>{getRangeText('labPhos')}</Text>
+        ) : null}
         <Text style={styles.note}>{LAB_R.phos.note}</Text>
       </Card>
 
@@ -321,7 +367,46 @@ export default function LabsScreen() {
             ) : null}
           </View>
         </View>
+        {log.labGlu ? (
+          <Text style={styles.rangeText}>{getRangeText('labGlu')}</Text>
+        ) : null}
         <Text style={styles.note}>{LAB_R.glu.note}</Text>
+      </Card>
+
+      {/* Extended Labs Toggle */}
+      <SectionLabel title="Extended Lab Panel" sub="ALT, AST, Magnesium, Hemoglobin, WBC, BUN" />
+      <Card>
+        <Pressable style={{ paddingVertical: 8, alignItems: 'center' }} onPress={() => setShowMoreLabs(!showMoreLabs)}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.indigo500 }}>{showMoreLabs ? '▲ Hide Extended Labs' : '▼ More Labs (ALT, AST, Mg, Hgb, WBC, BUN)'}</Text>
+        </Pressable>
+        {showMoreLabs ? (
+          <View>
+            <View style={styles.labRow}>
+              <NumberField label="ALT" value={log.labAlt} onChange={v => updLab('labAlt', v)} unit="U/L" />
+              <View style={{ width: 12 }} />
+              <NumberField label="AST" value={log.labAst} onChange={v => updLab('labAst', v)} unit="U/L" />
+            </View>
+            {(log.labAlt || log.labAst) ? (
+              <Text style={styles.rangeText}>ALT Normal: 0–56 U/L · AST Normal: 0–40 U/L</Text>
+            ) : null}
+            <View style={[styles.labRow, { marginTop: 12 }]}>
+              <NumberField label="Magnesium" value={log.labMg} onChange={v => updLab('labMg', v)} unit="mg/dL" />
+              <View style={{ width: 12 }} />
+              <NumberField label="Hemoglobin" value={log.labHgb} onChange={v => updLab('labHgb', v)} unit="g/dL" />
+            </View>
+            {(log.labMg || log.labHgb) ? (
+              <Text style={styles.rangeText}>Mg Normal: 1.7–2.5 mg/dL · Hgb Normal: 12–18 g/dL</Text>
+            ) : null}
+            <View style={[styles.labRow, { marginTop: 12 }]}>
+              <NumberField label="WBC" value={log.labWbc} onChange={v => updLab('labWbc', v)} unit="K/µL" />
+              <View style={{ width: 12 }} />
+              <NumberField label="BUN" value={log.labBun} onChange={v => updLab('labBun', v)} unit="mg/dL" />
+            </View>
+            {(log.labWbc || log.labBun) ? (
+              <Text style={styles.rangeText}>WBC Normal: 4.0–11.0 K/µL · BUN Normal: 7–25 mg/dL</Text>
+            ) : null}
+          </View>
+        ) : null}
       </Card>
 
       {/* Info Card */}
@@ -347,6 +432,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, color: colors.slate500, marginTop: 2 },
   labRow: { flexDirection: 'row', alignItems: 'flex-end' },
   note: { fontSize: 10, color: colors.slate400, marginTop: 4, fontWeight: '500' },
+  rangeText: { fontSize: 10, color: colors.slate500, marginTop: 3, fontStyle: 'italic' },
   importantNote: { fontSize: 11, color: colors.indigo600, marginTop: 8, fontWeight: '600', lineHeight: 16 },
   infoTitle: { fontSize: 13, fontWeight: '700', color: colors.sky700, marginBottom: 6 },
   infoText: { fontSize: 12, color: colors.sky700, lineHeight: 18 },
@@ -359,4 +445,25 @@ const styles = StyleSheet.create({
   importRemoveText: { fontSize: 14, color: colors.slate400 },
   importIcon: { fontSize: 20, marginRight: 8 },
   importNote: { fontSize: 11, color: colors.slate400, marginTop: 10, fontStyle: 'italic' },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: colors.slate800,
+    backgroundColor: colors.white,
+  },
+  todayBtn: {
+    backgroundColor: colors.indigo500,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  todayBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.white,
+  },
 });

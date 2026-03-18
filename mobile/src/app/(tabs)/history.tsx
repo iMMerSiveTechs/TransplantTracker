@@ -15,9 +15,24 @@ interface DataPoint {
   log: DailyLog | null;
 }
 
+const SYMPTOM_KEYS = ['incision','nausea','urineDown','burning','acidReflux','gas','bloating','diarrhea','constipation','tenderness','swelling','edema','fatigue'] as const;
+const SYMPTOM_LABELS: Record<string, string> = {
+  incision: 'Incision issues', nausea: 'Nausea', urineDown: 'Decreased urination',
+  burning: 'Burning urination', acidReflux: 'Acid reflux', gas: 'Gas', bloating: 'Bloating',
+  diarrhea: 'Diarrhea', constipation: 'Constipation', tenderness: 'Tenderness',
+  swelling: 'Swelling', edema: 'Edema', fatigue: 'Fatigue',
+};
+
+type SymFreq = { key: string; label: string; count: number; pct: number };
+
 export default function HistoryScreen() {
   const [dataPoints, setDataPoints] = useState<DataPoint[]>([]);
   const [loaded, setLoaded] = useState<boolean>(false);
+  const [symFreq, setSymFreq] = useState<SymFreq[]>([]);
+  const [avgWeight, setAvgWeight] = useState<number | null>(null);
+  const [avgMood, setAvgMood] = useState<number | null>(null);
+  const [avgSleep, setAvgSleep] = useState<number | null>(null);
+  const [avgFluid, setAvgFluid] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const today = new Date();
@@ -33,6 +48,28 @@ export default function HistoryScreen() {
 
     setDataPoints(points);
     setLoaded(true);
+
+    // Compute symptom frequency
+    const daysWithData = points.filter(p => p.log !== null).length;
+    const freq = SYMPTOM_KEYS.map(key => ({
+      key, label: SYMPTOM_LABELS[key],
+      count: points.filter(p => p.log && (p.log as any)[key] === true).length,
+      pct: daysWithData > 0 ? Math.round(points.filter(p => p.log && (p.log as any)[key] === true).length / daysWithData * 100) : 0,
+    })).filter(f => f.count > 0).sort((a, b) => b.count - a.count);
+    setSymFreq(freq);
+
+    // Compute 7-day weekly averages (points are oldest→newest, take last 7)
+    const last7 = points.slice(-7).filter(p => p.log !== null);
+
+    const weightVals = last7.map(p => parseFloat(p.log?.weight ?? '')).filter(n => !isNaN(n));
+    const moodVals = last7.map(p => p.log?.mood ?? 0).filter(n => n > 0);
+    const sleepVals = last7.map(p => p.log?.sleepQuality ?? 0).filter(n => n > 0);
+    const fluidVals = last7.map(p => p.log?.fluidMl ?? 0).filter(n => n > 0);
+
+    setAvgWeight(weightVals.length > 0 ? weightVals.reduce((a, b, _, arr) => a + b / arr.length, 0) : null);
+    setAvgMood(moodVals.length > 0 ? moodVals.reduce((a, b, _, arr) => a + b / arr.length, 0) : null);
+    setAvgSleep(sleepVals.length > 0 ? sleepVals.reduce((a, b, _, arr) => a + b / arr.length, 0) : null);
+    setAvgFluid(fluidVals.length > 0 ? fluidVals.reduce((a, b, _, arr) => a + b / arr.length, 0) : null);
   }, []);
 
   // Reload whenever the tab comes into focus so changes made on other tabs
@@ -54,6 +91,51 @@ export default function HistoryScreen() {
           <Text style={styles.loadingText}>Loading data...</Text>
         </Card>
       ) : null}
+
+      {/* Symptom Frequency Analysis */}
+      <SectionLabel title="Symptom Frequency" sub="Last 30 days (days reported)" />
+      {symFreq.length === 0 ? (
+        <Card flat style={{ backgroundColor: colors.emerald50 }}>
+          <Text style={{ fontSize: 13, color: colors.emerald700, textAlign: 'center', paddingVertical: 8 }}>
+            ✅ No symptoms reported in 30 days
+          </Text>
+        </Card>
+      ) : (
+        <Card>
+          {symFreq.map(f => (
+            <View key={f.key} style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.slate700 }}>{f.label}</Text>
+                <Text style={{ fontSize: 12, color: f.pct >= 50 ? colors.rose600 : f.pct >= 25 ? colors.amber700 : colors.slate500 }}>
+                  {f.count}d ({f.pct}%)
+                </Text>
+              </View>
+              <View style={{ height: 6, backgroundColor: colors.slate200, borderRadius: 999, overflow: 'hidden' }}>
+                <View style={{ width: `${f.pct}%`, height: '100%', borderRadius: 999,
+                  backgroundColor: f.pct >= 50 ? colors.rose500 : f.pct >= 25 ? colors.amber500 : colors.slate400 }} />
+              </View>
+            </View>
+          ))}
+        </Card>
+      )}
+
+      {/* Weekly Summary Card */}
+      <SectionLabel title="This Week at a Glance" />
+      <Card>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {[
+            { label: 'Avg Weight', value: avgWeight ? `${avgWeight.toFixed(1)} lbs` : '—' },
+            { label: 'Avg Mood', value: avgMood ? `${avgMood.toFixed(1)}/5` : '—' },
+            { label: 'Avg Sleep', value: avgSleep ? `${avgSleep.toFixed(1)}/5` : '—' },
+            { label: 'Avg Fluid', value: avgFluid ? `${Math.round(avgFluid)} mL` : '—' },
+          ].map(item => (
+            <View key={item.label} style={{ width: '45%', padding: 10, backgroundColor: colors.slate50, borderRadius: 10 }}>
+              <Text style={{ fontSize: 11, color: colors.slate500, fontWeight: '600', marginBottom: 2 }}>{item.label}</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.slate800 }}>{item.value}</Text>
+            </View>
+          ))}
+        </View>
+      </Card>
 
       {/* Weight Trend */}
       <SectionLabel title="Weight Tracking" />
@@ -169,6 +251,35 @@ export default function HistoryScreen() {
           color={colors.sky400}
         />
         <Text style={styles.chartNote}>Lab values show kidney function and immunosuppression levels</Text>
+      </Card>
+
+      {/* ALT Trend */}
+      <SectionLabel title="ALT (Liver Enzyme)" />
+      <Card>
+        <TrendChart
+          data={dataPoints}
+          dataKey="labAlt"
+          label="ALT"
+          unit="U/L"
+          color={colors.amber500}
+          dangerAbove={120}
+        />
+        <Text style={styles.chartNote}>Normal range: 0–56 U/L. Elevated ALT may indicate liver stress from medications.</Text>
+      </Card>
+
+      {/* Magnesium Trend */}
+      <SectionLabel title="Magnesium" />
+      <Card>
+        <TrendChart
+          data={dataPoints}
+          dataKey="labMg"
+          label="Magnesium"
+          unit="mg/dL"
+          color={colors.cyan800}
+          dangerBelow={1.5}
+          dangerAbove={2.5}
+        />
+        <Text style={styles.chartNote}>Normal range: 1.7–2.5 mg/dL. Low magnesium is common with tacrolimus.</Text>
       </Card>
 
       {/* Fluid Intake */}

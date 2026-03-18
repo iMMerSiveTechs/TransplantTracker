@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, TextInput, Alert } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
@@ -135,15 +135,44 @@ export default function TodayScreen() {
                      (!isNaN(pmSysNum) && (pmSysNum > CL_LIMITS.bpSysHigh || pmSysNum < CL_LIMITS.bpSysLow));
 
   const fluidPct = (log.fluidMl / CL_LIMITS.fluidGoal) * 100;
-  const hasSymptoms = log.incision || log.nausea || log.urineDown || log.burning || log.pain > 0;
+  const hasSymptoms = log.incision || log.nausea || log.urineDown || log.burning || log.pain > 0 || log.edema || log.fatigue || log.shortnessOfBreath;
 
   const todayWt = parseFloat(log.weight);
   const yestWt = parseFloat(prevWeight ?? '');
   const weightGainAmt = !isNaN(todayWt) && !isNaN(yestWt) ? todayWt - yestWt : 0;
   const hasWeightGain = weightGainAmt >= CL_LIMITS.weightGainAlert;
 
+  // Rejection risk logic
+  const feverPresent = hasFever;
+  const rejectionRisk = feverPresent && (log.tenderness || log.urineDown);
+  const possibleRejection = !rejectionRisk && (
+    [log.nausea, log.swelling, log.edema, log.fatigue, log.tenderness].filter(Boolean).length >= 2
+  );
+
+  // Health score summary
+  const vitalsLogged = log.amTemp !== '' || log.amSys !== '' || log.pmTemp !== '' || log.pmSys !== '';
+  let healthStatus: 'alerts' | 'good' | 'inprogress';
+  if (hasFever || hasWeightGain) {
+    healthStatus = 'alerts';
+  } else if (medsDone >= medsTotal && medsTotal > 0 && vitalsLogged) {
+    healthStatus = 'good';
+  } else {
+    healthStatus = 'inprogress';
+  }
+
   const handleTacTaken = () => {
     upd('lastTacTime', Date.now());
+  };
+
+  const handleFluidReset = () => {
+    Alert.alert(
+      'Reset Fluid Intake',
+      'Are you sure you want to reset today\'s fluid intake to 0 mL?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset', style: 'destructive', onPress: () => upd('fluidMl', 0) },
+      ]
+    );
   };
 
   return (
@@ -155,6 +184,36 @@ export default function TodayScreen() {
           <Text style={styles.date}>{fmtDate(today)}</Text>
         </View>
         <Badge label={`Day ${daysSince}`} variant="info" icon="📅" />
+      </View>
+
+      {/* Health Score Summary Card */}
+      <View style={styles.healthCard}>
+        <View style={styles.healthStatusRow}>
+          <Text style={styles.healthStatusText}>
+            {healthStatus === 'alerts'
+              ? '⚠️ Alerts Active'
+              : healthStatus === 'good'
+              ? '✅ Looking Good'
+              : '📋 In Progress'}
+          </Text>
+        </View>
+        <View style={styles.healthPills}>
+          <View style={styles.healthPill}>
+            <Text style={styles.healthPillText}>
+              {'💊 Doses '}{medsTotal > 0 ? `${medsDone}/${medsTotal}` : '–'}
+            </Text>
+          </View>
+          <View style={styles.healthPill}>
+            <Text style={styles.healthPillText}>
+              {'🌡️ Vitals '}{vitalsLogged ? 'logged' : '–'}
+            </Text>
+          </View>
+          <View style={styles.healthPill}>
+            <Text style={styles.healthPillText}>
+              {'💧 Fluids '}{Math.round(fluidPct)}{'%'}
+            </Text>
+          </View>
+        </View>
       </View>
 
       {/* Alerts */}
@@ -179,6 +238,24 @@ export default function TodayScreen() {
           icon="⚖️"
           title="Weight Gain Alert"
           msg={`You gained ${weightGainAmt.toFixed(1)} lbs since yesterday. Sudden weight gain can indicate fluid retention — contact your transplant team.`}
+          variant="warning"
+        />
+      ) : null}
+
+      {/* Rejection Risk Banner */}
+      {rejectionRisk ? (
+        <Alrt
+          icon="🚨"
+          title="Possible Rejection Signs"
+          msg="Fever with tenderness or decreased urination can be early rejection signs. Call your transplant coordinator NOW."
+          variant="danger"
+        />
+      ) : null}
+      {possibleRejection ? (
+        <Alrt
+          icon="⚠️"
+          title="Monitor Closely"
+          msg="Multiple symptoms present. If these continue or worsen, contact your transplant team today."
           variant="warning"
         />
       ) : null}
@@ -221,6 +298,11 @@ export default function TodayScreen() {
             unit="lbs"
           />
         </View>
+        {!isNaN(todayWt) && !isNaN(yestWt) ? (
+          <Text style={{ fontSize: 11, color: weightGainAmt > 0 ? colors.amber700 : colors.emerald700, marginTop: 4 }}>
+            {weightGainAmt > 0 ? '↑' : '↓'}{' '}{Math.abs(weightGainAmt).toFixed(1)} lbs from yesterday
+          </Text>
+        ) : null}
       </Card>
 
       {/* Morning Vitals */}
@@ -305,7 +387,16 @@ export default function TodayScreen() {
       <SectionLabel title="Fluid Intake" sub={`Goal: ${CL_LIMITS.fluidGoal} mL/day`} />
       <Card>
         <View style={styles.fluidHeader}>
-          <Text style={styles.fluidValue}>{log.fluidMl} mL</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={styles.fluidValue}>{log.fluidMl} mL</Text>
+            <Pressable
+              onPress={handleFluidReset}
+              style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.slate100, borderWidth: 1, borderColor: colors.slate200 }}
+              accessibilityLabel="Reset fluid intake"
+            >
+              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.slate500 }}>Reset</Text>
+            </Pressable>
+          </View>
           <Badge
             label={`${Math.round(fluidPct)}%`}
             variant={fluidPct >= 100 ? 'success' : fluidPct >= 75 ? 'info' : 'warning'}
@@ -315,14 +406,14 @@ export default function TodayScreen() {
           <View style={[styles.progressBar, { width: `${Math.min(fluidPct, 100)}%` }]} />
         </View>
         <View style={styles.fluidButtons}>
-          {[250, 500, 750].map((amt) => (
+          {[250, 350, 500, 750].map((amt) => (
             <Pressable
               key={amt}
               style={styles.fluidBtn}
               accessibilityLabel={`Add ${amt} milliliters of fluid`}
               onPress={() => upd('fluidMl', log.fluidMl + amt)}
             >
-              <Text style={styles.fluidBtnText}>+{amt} mL</Text>
+              <Text style={styles.fluidBtnText}>+{amt}</Text>
             </Pressable>
           ))}
         </View>
@@ -335,6 +426,9 @@ export default function TodayScreen() {
         <SymCheck label="Nausea/vomiting" checked={log.nausea} onPress={() => upd('nausea', !log.nausea)} />
         <SymCheck label="Decreased urination" checked={log.urineDown} onPress={() => upd('urineDown', !log.urineDown)} />
         <SymCheck label="Burning with urination" checked={log.burning} onPress={() => upd('burning', !log.burning)} />
+        <SymCheck label="Edema / swelling" checked={log.edema} onPress={() => upd('edema', !log.edema)} />
+        <SymCheck label="Unusual fatigue" checked={log.fatigue} onPress={() => upd('fatigue', !log.fatigue)} />
+        <SymCheck label="Shortness of breath" checked={log.shortnessOfBreath} onPress={() => upd('shortnessOfBreath', !log.shortnessOfBreath)} />
         <View style={{ height: 12 }} />
         <Text style={styles.painLabel}>Pain Level (0 = none): {log.pain}/10</Text>
         <View style={styles.painScale}>
@@ -366,6 +460,38 @@ export default function TodayScreen() {
         <SymCheck label="Constipation" checked={log.constipation} onPress={() => upd('constipation', !log.constipation)} color="amber" />
         <SymCheck label="Tenderness" checked={log.tenderness} onPress={() => upd('tenderness', !log.tenderness)} color="amber" />
         <SymCheck label="Swelling" checked={log.swelling} onPress={() => upd('swelling', !log.swelling)} color="amber" />
+      </Card>
+
+      {/* Today's Diet */}
+      <SectionLabel title="Today's Diet" sub="Tap what applies" />
+      <Card>
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {[
+            { key: 'dietHighK', label: '🟡 High K+', color: colors.amber500 },
+            { key: 'dietHighPhos', label: '🟣 High Phos', color: colors.purple700 },
+            { key: 'dietHighNa', label: '🔵 High Sodium', color: colors.sky700 },
+          ].map(flag => (
+            <Pressable
+              key={flag.key}
+              style={[{
+                flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1.5, alignItems: 'center',
+                borderColor: (log as any)[flag.key] ? flag.color : colors.slate200,
+                backgroundColor: (log as any)[flag.key] ? `${flag.color}18` : colors.white,
+              }]}
+              onPress={() => upd(flag.key as keyof DailyLog, !(log as any)[flag.key])}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: (log as any)[flag.key] ? flag.color : colors.slate500 }}>{flag.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <TextInput
+          style={{ marginTop: 10, padding: 10, borderRadius: 8, backgroundColor: colors.slate50, borderWidth: 1, borderColor: colors.slate200, fontSize: 13, color: colors.slate700, minHeight: 44, textAlignVertical: 'top' }}
+          placeholder="Diet notes (optional)..."
+          placeholderTextColor={colors.slate400}
+          value={log.dietNotes}
+          onChangeText={v => upd('dietNotes', v)}
+          maxLength={200}
+        />
       </Card>
 
       {/* Wellbeing Check-in */}
@@ -413,6 +539,20 @@ export default function TodayScreen() {
           ))}
         </View>
 
+        <Text style={styles.wbLabel}>Energy Level</Text>
+        <View style={styles.wbRow}>
+          {(['🪫', '😪', '😐', '⚡', '🚀'] as const).map((emoji, i) => (
+            <Pressable
+              key={i}
+              style={[styles.wbBtn, log.energyLevel === i + 1 && styles.wbBtnActive]}
+              onPress={() => upd('energyLevel', log.energyLevel === i + 1 ? 0 : i + 1)}
+            >
+              <Text style={styles.wbEmoji}>{emoji}</Text>
+              <Text style={styles.wbScale}>{['Very Low', 'Low', 'OK', 'Good', 'High'][i]}</Text>
+            </Pressable>
+          ))}
+        </View>
+
         <TextInput
           style={styles.wbNotes}
           placeholder="Any notes about how you're feeling..."
@@ -444,7 +584,7 @@ const styles = StyleSheet.create({
   progressBar: { height: '100%', backgroundColor: colors.indigo500, borderRadius: 999 },
   fluidButtons: { flexDirection: 'row', gap: 8 },
   fluidBtn: { flex: 1, minHeight: 44, backgroundColor: colors.indigo500, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  fluidBtnText: { fontSize: 14, fontWeight: '600', color: colors.white },
+  fluidBtnText: { fontSize: 13, fontWeight: '600', color: colors.white },
   painLabel: { fontSize: 12, fontWeight: '600', color: colors.slate600, marginBottom: 8 },
   painScale: { flexDirection: 'row', gap: 3 },
   painBtn: { flex: 1, minHeight: 44, paddingVertical: 8, backgroundColor: colors.slate100, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.slate200 },
@@ -464,4 +604,11 @@ const styles = StyleSheet.create({
   wbEmoji: { fontSize: 20 },
   wbScale: { fontSize: 8, fontWeight: '600', color: colors.slate400, marginTop: 2 },
   wbNotes: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: colors.slate50, borderWidth: 1, borderColor: colors.slate200, fontSize: 14, color: colors.slate700, minHeight: 60, textAlignVertical: 'top' },
+  // Health Score Summary Card
+  healthCard: { backgroundColor: colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: colors.slate200, padding: 14, marginBottom: 12 },
+  healthStatusRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  healthStatusText: { fontSize: 15, fontWeight: '700', color: colors.slate800, flex: 1 },
+  healthPills: { flexDirection: 'row', gap: 6 },
+  healthPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 99, backgroundColor: colors.slate100 },
+  healthPillText: { fontSize: 11, fontWeight: '600', color: colors.slate600 },
 });

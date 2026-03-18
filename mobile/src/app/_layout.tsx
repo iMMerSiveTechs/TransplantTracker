@@ -89,6 +89,10 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="food-guide" options={{ headerShown: false }} />
         <Stack.Screen name="pharmacy-hub" options={{ headerShown: false }} />
         <Stack.Screen name="insurance-hub" options={{ headerShown: false }} />
+        <Stack.Screen name="rejection-log" options={{ headerShown: false }} />
+        <Stack.Screen name="vaccination-record" options={{ headerShown: false }} />
+        <Stack.Screen name="clinical-notes" options={{ headerShown: false }} />
+        <Stack.Screen name="backup-restore" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
