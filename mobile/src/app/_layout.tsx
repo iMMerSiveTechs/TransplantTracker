@@ -86,6 +86,9 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="dev" options={{ title: 'Dev Tools', presentation: 'modal' }} />
+        <Stack.Screen name="food-guide" options={{ headerShown: false }} />
+        <Stack.Screen name="pharmacy-hub" options={{ headerShown: false }} />
+        <Stack.Screen name="insurance-hub" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

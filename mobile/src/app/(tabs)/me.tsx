@@ -452,6 +452,26 @@ export default function MeScreen() {
         </Card>
       ) : null}
 
+      {/* Quick Access Hub */}
+      <SectionLabel title="Quick Access" sub="Tools & Resources" />
+      <View style={styles.hubRow}>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/food-guide')} accessibilityRole="button" accessibilityLabel="Food Safety Guide">
+          <Text style={styles.hubIcon}>🥗</Text>
+          <Text style={styles.hubTitle}>Food Safety Guide</Text>
+          <Text style={styles.hubSub}>92 foods checked</Text>
+        </Pressable>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/pharmacy-hub')} accessibilityRole="button" accessibilityLabel="Pharmacy Hub">
+          <Text style={styles.hubIcon}>🏥</Text>
+          <Text style={styles.hubTitle}>Pharmacy Hub</Text>
+          <Text style={styles.hubSub}>Your pharmacies</Text>
+        </Pressable>
+        <Pressable style={styles.hubCard} onPress={() => router.push('/insurance-hub')} accessibilityRole="button" accessibilityLabel="Insurance Hub">
+          <Text style={styles.hubIcon}>🏦</Text>
+          <Text style={styles.hubTitle}>Insurance Hub</Text>
+          <Text style={styles.hubSub}>Plans & prior auth</Text>
+        </Pressable>
+      </View>
+
       {/* Share Info */}
       <Card flat style={{ backgroundColor: colors.emerald50 }}>
         <Text style={styles.shareInfoTitle}>📤 Share with Your Care Team</Text>
@@ -676,6 +696,11 @@ const styles = StyleSheet.create({
   editContactBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.slate300 },
   editContactBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate600 },
   noContactText: { fontSize: 13, color: colors.slate500, textAlign: 'center', paddingVertical: 8 },
+  hubRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  hubCard: { flex: 1, backgroundColor: colors.white, borderRadius: 14, borderWidth: 1.5, borderColor: colors.slate200, padding: 14, alignItems: 'center' },
+  hubIcon: { fontSize: 26, marginBottom: 6 },
+  hubTitle: { fontSize: 12, fontWeight: '700', color: colors.slate800, textAlign: 'center', marginBottom: 2 },
+  hubSub: { fontSize: 10, color: colors.slate500, textAlign: 'center' },
   devBtn: { marginTop: 8, paddingVertical: 10, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: colors.slate300, alignSelf: 'center' },
   devBtnText: { fontSize: 12, fontWeight: '600', color: colors.slate400 },
   shareInfoTitle: { fontSize: 14, fontWeight: '700', color: colors.emerald700, marginBottom: 6 },

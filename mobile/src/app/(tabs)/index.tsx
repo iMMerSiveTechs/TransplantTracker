@@ -5,7 +5,7 @@ import * as Burnt from 'burnt';
 import { colors } from '@/data/colors';
 import { EMPTY_LOG, type DailyLog, type MedDose, type Medication } from '@/data/types';
 import { CL_LIMITS } from '@/data/clinicalLimits';
-import { toId, fmtDate, greet, dBt, getSurgDefault } from '@/utils/dates';
+import { toId, fmtDate, greet, dBt, getSurgDefault, addD } from '@/utils/dates';
 import S from '@/utils/storage';
 import Card from '@/components/Card';
 import NumberField from '@/components/NumberField';
@@ -26,6 +26,7 @@ export default function TodayScreen() {
   const [profile, setProfile] = useState<any>(null);
   const [medsDone, setMedsDone] = useState<number>(0);
   const [medsTotal, setMedsTotal] = useState<number>(0);
+  const [prevWeight, setPrevWeight] = useState<string | null>(null);
   const router = useRouter();
 
   const today = new Date();
@@ -57,6 +58,10 @@ export default function TodayScreen() {
       setLog(EMPTY_LOG);
       setLogFromStorage(false);
     }
+    // Load yesterday's weight for gain comparison
+    const yesterday = toId(addD(new Date(), -1));
+    const prevLog = await S.get(`log_${yesterday}`);
+    setPrevWeight(prevLog?.weight ?? null);
     setLoadedDateKey(currentId);
     setLoaded(true);
   }, []);
@@ -132,6 +137,11 @@ export default function TodayScreen() {
   const fluidPct = (log.fluidMl / CL_LIMITS.fluidGoal) * 100;
   const hasSymptoms = log.incision || log.nausea || log.urineDown || log.burning || log.pain > 0;
 
+  const todayWt = parseFloat(log.weight);
+  const yestWt = parseFloat(prevWeight ?? '');
+  const weightGainAmt = !isNaN(todayWt) && !isNaN(yestWt) ? todayWt - yestWt : 0;
+  const hasWeightGain = weightGainAmt >= CL_LIMITS.weightGainAlert;
+
   const handleTacTaken = () => {
     upd('lastTacTime', Date.now());
   };
@@ -161,6 +171,14 @@ export default function TodayScreen() {
           icon="⚠️"
           title="Blood Pressure Alert"
           msg="BP outside normal range. Monitor closely and contact team if persistent."
+          variant="warning"
+        />
+      ) : null}
+      {hasWeightGain ? (
+        <Alrt
+          icon="⚖️"
+          title="Weight Gain Alert"
+          msg={`You gained ${weightGainAmt.toFixed(1)} lbs since yesterday. Sudden weight gain can indicate fluid retention — contact your transplant team.`}
           variant="warning"
         />
       ) : null}

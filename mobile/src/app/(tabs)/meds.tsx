@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Modal, TextInput, Platform } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -11,7 +11,9 @@ import Card from '@/components/Card';
 import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
 import Alrt from '@/components/Alert';
+import InteractionCard from '@/components/InteractionCard';
 import { requestNotificationPermission, scheduleMedReminder, cancelMedReminder } from '@/lib/notifications';
+import { evaluateInteractions } from '@/lib/interactionEngine';
 import { EMPTY_LOG, type Medication, type MedDose } from '@/data/types';
 import { toId } from '@/utils/dates';
 
@@ -33,6 +35,20 @@ export default function MedsScreen() {
   const [formPpd, setFormPpd] = useState<string>('1');
   const [formCritical, setFormCritical] = useState<boolean>(false);
   const [formColor, setFormColor] = useState<string>('#6366F1');
+
+  // Extended modal fields
+  const [formGenericName, setFormGenericName] = useState<string>('');
+  const [formIndication, setFormIndication] = useState<string>('');
+  const [formRxNumber, setFormRxNumber] = useState<string>('');
+  const [formRefills, setFormRefills] = useState<string>('');
+  const [formLastFilled, setFormLastFilled] = useState<string>('');
+  const [formPharmacy, setFormPharmacy] = useState<string>('');
+  const [formPharmacyPhone, setFormPharmacyPhone] = useState<string>('');
+  const [formPriorAuth, setFormPriorAuth] = useState<Medication['priorAuthStatus']>('not_needed');
+  const [showMoreDetails, setShowMoreDetails] = useState<boolean>(false);
+
+  // Interactions visibility
+  const [showInteractions, setShowInteractions] = useState<boolean>(false);
 
   // Dose adherence state
   const [todayDoses, setTodayDoses] = useState<MedDose[]>([]);
@@ -168,6 +184,10 @@ export default function MedsScreen() {
     setFormName(''); setFormDosage(''); setFormInstr('');
     setFormInv('30'); setFormPpd('1');
     setFormCritical(false); setFormColor('#6366F1');
+    setFormGenericName(''); setFormIndication(''); setFormRxNumber('');
+    setFormRefills(''); setFormLastFilled(''); setFormPharmacy('');
+    setFormPharmacyPhone(''); setFormPriorAuth('not_needed');
+    setShowMoreDetails(false);
     setShowAddModal(true);
   };
 
@@ -176,6 +196,15 @@ export default function MedsScreen() {
     setFormName(med.name); setFormDosage(med.dosage); setFormInstr(med.instr);
     setFormInv(String(med.inv)); setFormPpd(String(med.ppd));
     setFormCritical(med.critical); setFormColor(med.color);
+    setFormGenericName(med.genericName ?? '');
+    setFormIndication(med.indication ?? '');
+    setFormRxNumber(med.rxNumber ?? '');
+    setFormRefills(med.refillsRemaining != null ? String(med.refillsRemaining) : '');
+    setFormLastFilled(med.lastFilledDate ?? '');
+    setFormPharmacy(med.pharmacyName ?? '');
+    setFormPharmacyPhone(med.pharmacyPhone ?? '');
+    setFormPriorAuth(med.priorAuthStatus ?? 'not_needed');
+    setShowMoreDetails(false);
     setShowAddModal(true);
   };
 
@@ -186,12 +215,24 @@ export default function MedsScreen() {
       Burnt.toast({ title: 'Pills per day must be at least 1', preset: 'error' });
       return;
     }
+    const extFields: Partial<Medication> = {
+      genericName: formGenericName.trim() || undefined,
+      indication: formIndication.trim() || undefined,
+      rxNumber: formRxNumber.trim() || undefined,
+      refillsRemaining: formRefills.trim() ? parseInt(formRefills) : undefined,
+      lastFilledDate: formLastFilled.trim() || undefined,
+      pharmacyName: formPharmacy.trim() || undefined,
+      pharmacyPhone: formPharmacyPhone.trim() || undefined,
+      priorAuthStatus: formPriorAuth,
+    };
+
     if (editingMed) {
       const updatedMed: Medication = {
         ...editingMed,
         name: formName.trim(), dosage: formDosage.trim(), instr: formInstr.trim(),
         inv: parseInt(formInv) || 30, ppd: parseInt(formPpd) || 1,
         critical: formCritical, color: formColor,
+        ...extFields,
       };
       setMeds(meds.map(m => m.id === editingMed.id ? updatedMed : m));
       // Reschedule notification if enabled — ensures name/time changes take effect
@@ -205,6 +246,7 @@ export default function MedsScreen() {
         name: formName.trim(), dosage: formDosage.trim(), instr: formInstr.trim(),
         inv: parseInt(formInv) || 30, ppd: parseInt(formPpd) || 1,
         critical: formCritical, color: formColor,
+        ...extFields,
       };
       setMeds([...meds, newMed]);
     }
@@ -221,6 +263,9 @@ export default function MedsScreen() {
     const daysLeft = Math.floor(med.inv / med.ppd);
     return { show: daysLeft <= CL_LIMITS.lowMedDays, daysLeft };
   };
+
+  const interactions = useMemo(() => evaluateInteractions(meds), [meds]);
+  const alertInteractions = interactions.filter(r => r.rule.severity !== 'informational');
 
   const criticalMeds = meds.filter(m => m.critical);
   const otherMeds = meds.filter(m => !m.critical);
@@ -374,6 +419,37 @@ export default function MedsScreen() {
         </Pressable>
       </View>
 
+      {/* Drug Interactions Section */}
+      {interactions.length > 0 ? (
+        <View style={styles.interactionsSection}>
+          <Pressable style={styles.interactionsHeader} onPress={() => setShowInteractions(!showInteractions)}>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.interactionsTitle}>Drug Interactions</Text>
+                {alertInteractions.length > 0 ? (
+                  <View style={styles.interactionsBadge}>
+                    <Text style={styles.interactionsBadgeText}>{alertInteractions.length}</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text style={styles.interactionsSub}>
+                {alertInteractions.length > 0
+                  ? `${alertInteractions.length} interaction${alertInteractions.length !== 1 ? 's' : ''} to review`
+                  : `${interactions.length} informational note${interactions.length !== 1 ? 's' : ''}`}
+              </Text>
+            </View>
+            <Text style={styles.interactionsChevron}>{showInteractions ? '▲' : '▼'}</Text>
+          </Pressable>
+          {showInteractions ? (
+            <View style={styles.interactionsList}>
+              {interactions.map(r => (
+                <InteractionCard key={`${r.rule.id}:${r.medication.id}`} result={r} />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {meds.some(m => getLowStockWarning(m).show) ? (
         <Alrt
           icon="💊"
@@ -455,6 +531,51 @@ export default function MedsScreen() {
               {formCritical ? 'Critical — do not skip or run out' : 'Mark as critical'}
             </Text>
           </Pressable>
+
+          {/* More Details collapsible */}
+          <Pressable style={styles.moreDetailsToggle} onPress={() => setShowMoreDetails(!showMoreDetails)}>
+            <Text style={styles.moreDetailsToggleText}>{showMoreDetails ? '▲ Hide Details' : '▼ More Details (Pharmacy, Insurance, Notes)'}</Text>
+          </Pressable>
+
+          {showMoreDetails ? (
+            <View>
+              <Text style={styles.modalLabel}>Generic Name</Text>
+              <TextInput value={formGenericName} onChangeText={setFormGenericName} placeholder="e.g. tacrolimus" placeholderTextColor={colors.slate300} maxLength={80} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Why You Take This</Text>
+              <TextInput value={formIndication} onChangeText={setFormIndication} placeholder="e.g. Prevents organ rejection" placeholderTextColor={colors.slate300} maxLength={120} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Rx Number</Text>
+              <TextInput value={formRxNumber} onChangeText={setFormRxNumber} placeholder="Prescription number" placeholderTextColor={colors.slate300} maxLength={40} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Refills Remaining</Text>
+              <TextInput value={formRefills} onChangeText={setFormRefills} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.slate300} maxLength={3} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Last Filled Date (YYYY-MM-DD)</Text>
+              <TextInput value={formLastFilled} onChangeText={setFormLastFilled} placeholder="2025-01-15" placeholderTextColor={colors.slate300} maxLength={10} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Pharmacy Name</Text>
+              <TextInput value={formPharmacy} onChangeText={setFormPharmacy} placeholder="e.g. CVS, Walgreens" placeholderTextColor={colors.slate300} maxLength={80} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Pharmacy Phone</Text>
+              <TextInput value={formPharmacyPhone} onChangeText={setFormPharmacyPhone} keyboardType="phone-pad" placeholder="(555) 123-4567" placeholderTextColor={colors.slate300} maxLength={20} style={styles.modalInput} />
+
+              <Text style={styles.modalLabel}>Prior Authorization</Text>
+              <View style={styles.priorAuthRow}>
+                {(['not_needed', 'pending', 'approved', 'denied'] as const).map(status => (
+                  <Pressable
+                    key={status}
+                    style={[styles.priorAuthChip, formPriorAuth === status ? styles.priorAuthChipActive : null]}
+                    onPress={() => setFormPriorAuth(status)}
+                  >
+                    <Text style={[styles.priorAuthChipText, formPriorAuth === status ? styles.priorAuthChipTextActive : null]}>
+                      {status === 'not_needed' ? 'None' : status.charAt(0).toUpperCase() + status.slice(1)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           <Pressable style={[styles.saveBtn, !formName.trim() ? styles.btnDisabled : null]} disabled={!formName.trim()} onPress={saveMed}>
             <Text style={styles.saveBtnText}>{editingMed ? 'Save Changes' : 'Add Medication'}</Text>
@@ -553,6 +674,21 @@ const styles = StyleSheet.create({
   confirmCancelText: { fontSize: 14, fontWeight: '600', color: colors.slate700 },
   confirmDeleteBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.rose500, alignItems: 'center' },
   confirmDeleteBtnText: { fontSize: 14, fontWeight: '700', color: colors.white },
+  interactionsSection: { marginBottom: 16, borderRadius: 14, borderWidth: 1.5, borderColor: colors.amber200, backgroundColor: colors.amber50, overflow: 'hidden' },
+  interactionsHeader: { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  interactionsTitle: { fontSize: 15, fontWeight: '700', color: colors.amber700 },
+  interactionsSub: { fontSize: 12, color: colors.amber700, marginTop: 2 },
+  interactionsBadge: { backgroundColor: colors.rose500, borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2 },
+  interactionsBadgeText: { fontSize: 11, fontWeight: '700', color: colors.white },
+  interactionsChevron: { fontSize: 11, color: colors.amber500 },
+  interactionsList: { paddingHorizontal: 12, paddingBottom: 12 },
+  moreDetailsToggle: { marginTop: 20, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.slate100, alignItems: 'center' },
+  moreDetailsToggleText: { fontSize: 13, fontWeight: '600', color: colors.slate600 },
+  priorAuthRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginTop: 4 },
+  priorAuthChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, borderWidth: 1.5, borderColor: colors.slate300, backgroundColor: colors.white },
+  priorAuthChipActive: { borderColor: colors.indigo500, backgroundColor: colors.indigo500 },
+  priorAuthChipText: { fontSize: 12, fontWeight: '600', color: colors.slate600 },
+  priorAuthChipTextActive: { color: colors.white },
   doseSection: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.slate50, padding: 12, borderRadius: 10, marginBottom: 12 },
   doseStatus: { fontSize: 13, fontWeight: '600', color: colors.slate700 },
   lastDoseTime: { fontSize: 11, color: colors.slate500, marginTop: 2 },

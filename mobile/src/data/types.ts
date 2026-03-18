@@ -78,6 +78,16 @@ export interface Profile {
   emergPhone: string;
 }
 
+export interface Appointment {
+  id: string;
+  date: string;
+  time: string;
+  doc: string;
+  desc: string;
+  type?: string;
+  labBy?: string;
+}
+
 export interface Medication {
   id: string;
   name: string;
@@ -90,14 +100,46 @@ export interface Medication {
   isTac?: boolean;
   notifyEnabled?: boolean;
   reminderTime?: string; // "HH:MM" 24-hour format
+  // Extended fields (all optional — non-destructive to existing data)
+  genericName?: string;
+  indication?: string;      // "Prevents organ rejection"
+  rxNumber?: string;
+  refillsRemaining?: number;
+  lastFilledDate?: string;  // "YYYY-MM-DD"
+  refillByDate?: string;    // "YYYY-MM-DD"
+  pharmacyName?: string;
+  pharmacyPhone?: string;
+  formularyTier?: number;   // 1–5
+  copayAmount?: number;     // dollars per fill
+  priorAuthStatus?: 'not_needed' | 'pending' | 'approved' | 'denied';
 }
 
-export interface Appointment {
+// Pharmacy — stored at key `pharmacies`
+export interface Pharmacy {
   id: string;
-  date: string;
-  time: string;
-  doc: string;
-  desc: string;
-  type?: string;
-  labBy?: string;
+  name: string;
+  phone?: string;
+  website?: string;
+  address?: string;
+  notes?: string;
+  isPrimary?: boolean;
+}
+
+// Insurance plan — stored at key `insurance_plans`
+export interface InsurancePlan {
+  id: string;
+  planName: string;
+  payerName: string;
+  memberId: string;
+  groupNumber?: string;
+  bin?: string;
+  pcn?: string;
+  rxGroup?: string;
+  effectiveDate?: string;
+  pbmName?: string;
+  pbmPhone?: string;
+  deductible?: string;
+  oopMax?: string;
+  isPrimary?: boolean;
+  notes?: string;
 }
