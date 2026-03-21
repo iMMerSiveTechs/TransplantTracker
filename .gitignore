@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.bun/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+
+# Build output
+dist/
+build/
+.expo/
+ios/
+android/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Original zip (extracted into repo)
+*.zip
