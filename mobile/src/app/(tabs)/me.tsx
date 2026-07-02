@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors } from '@/data/colors';
 import { RESTS, INIT_APPTS } from '@/data/restrictions';
 import { dBt, wBt, fmtDate, SURG_DEFAULT } from '@/utils/dates';
@@ -8,13 +9,16 @@ import Card from '@/components/Card';
 import SectionLabel from '@/components/SectionLabel';
 import Badge from '@/components/Badge';
 import MiniCal from '@/components/MiniCal';
+import { signOut } from '@/lib/auth';
 import type { Profile, Appointment } from '@/data/types';
 
 export default function MeScreen() {
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [appts, setAppts] = useState<Appointment[]>(INIT_APPTS);
   const [calMonth, setCalMonth] = useState<number>(new Date().getMonth());
   const [calYear, setCalYear] = useState<number>(new Date().getFullYear());
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
 
   const today = new Date();
   const daysSince = dBt(SURG_DEFAULT, today);
@@ -24,8 +28,10 @@ export default function MeScreen() {
     async function load() {
       const savedProfile = await S.get('profile');
       const savedAppts = await S.get('appointments');
+      const loggedIn = await S.get('auth_logged_in');
       if (savedProfile) setProfile(savedProfile);
       if (savedAppts) setAppts(savedAppts);
+      setIsLoggedIn(!!loggedIn);
     }
     load();
   }, []);
@@ -214,6 +220,48 @@ export default function MeScreen() {
         </Card>
       ))}
 
+      {/* Account */}
+      <SectionLabel title="Account" />
+      {isLoggedIn ? (
+        <Card>
+          <View style={styles.accountRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.accountLabel}>Cloud Sync Active</Text>
+              <Text style={styles.accountSub}>Your data is being synced to the cloud</Text>
+            </View>
+            <Badge label="Synced" variant="success" />
+          </View>
+          <View style={styles.divider} />
+          <Pressable
+            style={styles.signOutBtn}
+            onPress={async () => {
+              try { await signOut(); } catch (_) {}
+              await S.del('auth_logged_in');
+              await S.del('auth_skipped');
+              router.replace('/login');
+            }}
+          >
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </Pressable>
+        </Card>
+      ) : (
+        <Card>
+          <View style={styles.accountRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.accountLabel}>Local Only</Text>
+              <Text style={styles.accountSub}>Sign in to sync data across devices</Text>
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <Pressable
+            style={styles.signInBtn}
+            onPress={() => router.replace('/login')}
+          >
+            <Text style={styles.signInText}>Sign In / Create Account</Text>
+          </Pressable>
+        </Card>
+      )}
+
       <View style={{ height: 40 }} />
     </ScrollView>
   );
@@ -259,4 +307,11 @@ const styles = StyleSheet.create({
   contactLabel: { fontSize: 14, fontWeight: '700', color: colors.slate800 },
   contactSub: { fontSize: 12, color: colors.slate600, marginTop: 2 },
   contactPhone: { fontSize: 13, fontWeight: '600', color: colors.indigo500, marginTop: 4 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 4 },
+  accountLabel: { fontSize: 14, fontWeight: '700', color: colors.slate800 },
+  accountSub: { fontSize: 12, color: colors.slate500, marginTop: 2 },
+  signOutBtn: { paddingVertical: 12, alignItems: 'center' },
+  signOutText: { fontSize: 14, fontWeight: '600', color: colors.rose500 },
+  signInBtn: { backgroundColor: colors.indigo500, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  signInText: { fontSize: 14, fontWeight: '600', color: colors.white },
 });

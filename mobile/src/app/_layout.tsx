@@ -8,10 +8,9 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 
 export const unstable_settings = {
-  initialRouteName: 'setup',
+  initialRouteName: 'login',
 };
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
@@ -20,6 +19,7 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>
+        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
@@ -27,8 +27,6 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
     </ThemeProvider>
   );
 }
-
-
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();

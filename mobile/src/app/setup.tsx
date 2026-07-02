@@ -6,6 +6,7 @@ import { TRANSPLANT_TYPES, INIT_MEDS, INIT_APPTS } from '@/data/restrictions';
 import { SURG_DEFAULT } from '@/utils/dates';
 import S from '@/utils/storage';
 import Card from '@/components/Card';
+import { api } from '@/lib/api/api';
 import type { Profile, Contact } from '@/data/types';
 
 export default function SetupScreen() {
@@ -32,6 +33,41 @@ export default function SetupScreen() {
     await S.set('medications', INIT_MEDS);
     await S.set('appointments', INIT_APPTS);
     await S.set('onboarding_complete', true);
+
+    try {
+      const isLoggedIn = await S.get('auth_logged_in');
+      if (isLoggedIn) {
+        await api.post('/api/sync', {
+          profile: {
+            name: profile.name,
+            type: profile.type,
+            surgDate: profile.surgDate instanceof Date
+              ? profile.surgDate.toISOString().split('T')[0]
+              : String(profile.surgDate),
+            emergPhone: profile.emergPhone,
+            contacts: profile.contacts,
+          },
+          medications: INIT_MEDS.map((m) => ({
+            name: m.name,
+            dosage: m.dosage,
+            instr: m.instr,
+            inv: m.inv,
+            ppd: m.ppd,
+            critical: m.critical,
+            color: m.color,
+            isTac: m.isTac,
+          })),
+          appointments: INIT_APPTS.map((a) => ({
+            date: a.date,
+            time: a.time,
+            doc: a.doc,
+            desc: a.desc,
+            type: (a as any).type || '',
+            labBy: (a as any).labBy || '',
+          })),
+        });
+      }
+    } catch (_) {}
 
     router.replace('/(tabs)');
   };

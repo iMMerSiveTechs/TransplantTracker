@@ -5,9 +5,11 @@ import { z } from "zod";
  * This ensures all required environment variables are present and valid
  */
 const envSchema = z.object({
-  // Server Configuration
   PORT: z.string().optional().default("3000"),
   NODE_ENV: z.string().optional(),
+  DATABASE_URL: z.string().optional().default("file:./dev.db"),
+  BETTER_AUTH_SECRET: z.string().optional().default("transplant-tracker-dev-secret"),
+  BACKEND_URL: z.string().optional(),
 });
 
 /**
