@@ -220,6 +220,25 @@ export default function MeScreen() {
         </Card>
       ))}
 
+      {/* Quick Actions */}
+      <SectionLabel title="Tools" />
+      <View style={styles.actionsRow}>
+        <Pressable
+          style={styles.actionBtn}
+          onPress={() => router.push('/foods')}
+        >
+          <Text style={styles.actionIcon}>🍎</Text>
+          <Text style={styles.actionLabel}>Food Guide</Text>
+        </Pressable>
+        <Pressable
+          style={styles.actionBtn}
+          onPress={() => router.push('/export')}
+        >
+          <Text style={styles.actionIcon}>📋</Text>
+          <Text style={styles.actionLabel}>Export Data</Text>
+        </Pressable>
+      </View>
+
       {/* Account */}
       <SectionLabel title="Account" />
       {isLoggedIn ? (
@@ -314,4 +333,16 @@ const styles = StyleSheet.create({
   signOutText: { fontSize: 14, fontWeight: '600', color: colors.rose500 },
   signInBtn: { backgroundColor: colors.indigo500, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   signInText: { fontSize: 14, fontWeight: '600', color: colors.white },
+  actionsRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
+  actionBtn: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.slate200,
+  },
+  actionIcon: { fontSize: 28, marginBottom: 8 },
+  actionLabel: { fontSize: 13, fontWeight: '600', color: colors.slate700 },
 });

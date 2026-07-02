@@ -22,6 +22,8 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="setup" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="foods" options={{ title: 'Food Safety Guide' }} />
+        <Stack.Screen name="export" options={{ presentation: 'formSheet' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
