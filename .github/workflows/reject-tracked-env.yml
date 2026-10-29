@@ -1,0 +1,52 @@
+name: Reject tracked environment files
+
+on:
+  pull_request:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reject-tracked-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout without persisted credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check tracked configuration (never print values)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import PurePosixPath
+          import subprocess
+          import sys
+
+          examples = {".env.example", ".env.sample", ".env.template"}
+
+          def forbidden(path):
+              name = PurePosixPath(path).name
+              return (name == ".env" or name.startswith(".env.")) and name not in examples
+
+          fixtures = {
+              "backend/.env": True,
+              "backend/.env.production": True,
+              "api/.env.local": True,
+              ".env.example": False,
+              "backend/.env.template": False,
+              "README.md": False,
+          }
+          for path, expected in fixtures.items():
+              assert forbidden(path) == expected
+
+          tracked = subprocess.check_output(["git", "ls-files", "-z"]).split(b"\0")
+          violations = sum(bool(item) and forbidden(item.decode("utf-8", "surrogateescape"))
+                           for item in tracked)
+          if violations:
+              print(f"FAIL: {violations} tracked environment file(s); names and values suppressed")
+              sys.exit(1)
+          print("PASS: no tracked environment configuration")
+          PY
